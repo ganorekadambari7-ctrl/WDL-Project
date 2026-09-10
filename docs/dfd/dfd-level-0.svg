@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820">
+  <style>text{font-family:Arial,sans-serif;fill:#172554}.title{font-size:30px;font-weight:bold}.label{font-size:19px;font-weight:bold}.small{font-size:15px}.entity{fill:#eff6ff;stroke:#2563eb;stroke-width:2}.process{fill:#f5f3ff;stroke:#7c3aed;stroke-width:3}.store{fill:#ecfdf5;stroke:#059669;stroke-width:2}.flow{stroke:#475569;stroke-width:2.2;fill:none;marker-end:url(#arrow)}</style>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker></defs>
+  <rect width="1400" height="820" fill="#f8fafc"/><text x="700" y="55" text-anchor="middle" class="title">DFD Level 0 - Salary Pro Salary Management System</text>
+  <rect x="80" y="180" width="210" height="90" rx="12" class="entity"/><text x="185" y="230" text-anchor="middle" class="label">Admin</text>
+  <rect x="1110" y="180" width="210" height="90" rx="12" class="entity"/><text x="1215" y="230" text-anchor="middle" class="label">Employee</text>
+  <rect x="535" y="565" width="330" height="105" rx="12" class="store"/><text x="700" y="610" text-anchor="middle" class="label">MongoDB Database</text><text x="700" y="637" text-anchor="middle" class="small">Users, Employees, Attendance, Leave, Salary</text>
+  <rect x="1090" y="570" width="230" height="90" rx="12" class="entity"/><text x="1205" y="610" text-anchor="middle" class="label">PDF Generator</text>
+  <circle cx="700" cy="340" r="170" class="process"/><text x="700" y="323" text-anchor="middle" class="label">Salary Pro</text><text x="700" y="350" text-anchor="middle" class="label">Salary Management</text><text x="700" y="377" text-anchor="middle" class="label">System</text>
+  <path d="M290 220 L525 290" class="flow"/><text x="350" y="235" class="small">Employee, attendance, payroll,</text><text x="350" y="254" class="small">leave and report requests</text>
+  <path d="M525 390 L290 430" class="flow"/><text x="325" y="408" class="small">Dashboard, reports,</text><text x="325" y="427" class="small">insights and results</text>
+  <path d="M1110 220 L875 290" class="flow"/><text x="904" y="235" class="small">Login, profile and</text><text x="904" y="254" class="small">leave requests</text>
+  <path d="M875 390 L1110 430" class="flow"/><text x="930" y="408" class="small">Leave status, limited dashboard,</text><text x="930" y="427" class="small">payslip access</text>
+  <path d="M650 510 L650 565" class="flow"/><path d="M750 565 L750 510" class="flow"/><text x="770" y="545" class="small">Read / write records</text>
+  <path d="M845 455 L1090 570" class="flow"/><text x="930" y="505" class="small">Employee and salary data</text><path d="M1090 620 L870 470" class="flow"/><text x="965" y="610" class="small">Generated payslip PDF</text>
+</svg>
