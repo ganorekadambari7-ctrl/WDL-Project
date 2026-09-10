@@ -1,3 +1,5 @@
+# WDL-Project
+
 # Salary Pro
 
 Full-stack salary management system built with React, Tailwind CSS, Express, and MongoDB.
