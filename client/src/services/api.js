@@ -30,9 +30,15 @@ export const attendanceApi = {
 };
 
 export const leaveApi = {
-  list: () => request('/leave'),
+  list: (params) => {
+    const q = params ? new URLSearchParams(Object.entries(params).filter(([_, v]) => v !== undefined && v !== '')).toString() : '';
+    return request(`/leave${q ? `?${q}` : ''}`);
+  },
   apply: (body) => request('/leave', { method: 'POST', body: JSON.stringify(body) }),
-  review: (id, status) => request(`/leave/${id}`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  review: (id, payload) => {
+    const body = typeof payload === 'string' ? { status: payload } : payload;
+    return request(`/leave/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+  },
 };
 
 export const salaryApi = {

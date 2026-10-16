@@ -664,24 +664,58 @@ class TestBB12MarkAttendance:
 # BB13 — Submit Employee Leave Request
 # ---------------------------------------------------------------------------
 
+def _get_linked_employee_token(client):
+    admin_token = _get_auth_token(client, "admin")
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    emp_doc = _unique_employee()
+    created_emp = client.post("/api/employees", json=emp_doc, headers=admin_headers).json()
+
+    user = _unique_user("employee")
+    reg = client.post("/api/auth/register", json=user)
+    user_data = reg.json()["user"]
+    emp_token = reg.json()["token"]
+
+    client.put(
+        f"/api/settings/users/{user_data['id']}/link-employee",
+        json={"employeeId": created_emp["employeeId"]},
+        headers=admin_headers,
+    )
+    return emp_token, created_emp["employeeId"]
+
+
 class TestBB13SubmitLeave:
     """
-    BB13: Any authenticated user can submit a leave request.
+    BB13: Employee accounts can submit leave requests; Admins are forbidden from applying.
 
     Endpoint: POST /api/leave
-      body: { employeeId, startDate, endDate, leaveType, reason, lateMark? }
+      body: { startDate, endDate, leaveType, reason, lateMark? }
       leaveType: 'full-day' | 'half-day'
       New requests default to status='pending'.
     """
 
-    def test_submit_full_day_leave(self, auth_api_client):
+    def test_admin_cannot_submit_leave(self, auth_api_client):
+        """Admins are forbidden from submitting leave requests (HTTP 403)."""
         token = _get_auth_token(auth_api_client, "admin")
-        emp = _unique_employee()
+        resp = auth_api_client.post(
+            "/api/leave",
+            json={
+                "startDate": "2026-10-01",
+                "endDate": "2026-10-03",
+                "leaveType": "full-day",
+                "reason": "Admin trying to apply",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403, (
+            f"[BB13-AdminBlock] Admin must receive 403, got {resp.status_code}: {resp.text}"
+        )
+
+    def test_submit_full_day_leave(self, auth_api_client):
+        token, emp_id = _get_linked_employee_token(auth_api_client)
 
         resp = auth_api_client.post(
             "/api/leave",
             json={
-                "employeeId": emp["employeeId"],
                 "startDate": "2026-10-01",
                 "endDate": "2026-10-03",
                 "leaveType": "full-day",
@@ -697,16 +731,15 @@ class TestBB13SubmitLeave:
         body = resp.json()
         assert body["status"] == "pending", "[BB13] New leave should default to 'pending'"
         assert body["leaveType"] == "full-day", "[BB13] leaveType mismatch"
+        assert body["employeeId"] == emp_id, "[BB13] employeeId must match linked employee"
         assert "_id" in body, "[BB13] Response missing '_id'"
 
     def test_submit_half_day_leave(self, auth_api_client):
-        token = _get_auth_token(auth_api_client, "admin")
-        emp = _unique_employee()
+        token, emp_id = _get_linked_employee_token(auth_api_client)
 
         resp = auth_api_client.post(
             "/api/leave",
             json={
-                "employeeId": emp["employeeId"],
                 "startDate": "2026-10-05",
                 "endDate": "2026-10-05",
                 "leaveType": "half-day",
@@ -722,13 +755,11 @@ class TestBB13SubmitLeave:
 
     def test_end_before_start_rejected(self, auth_api_client):
         """endDate before startDate must return HTTP 400."""
-        token = _get_auth_token(auth_api_client, "admin")
-        emp = _unique_employee()
+        token, _ = _get_linked_employee_token(auth_api_client)
 
         resp = auth_api_client.post(
             "/api/leave",
             json={
-                "employeeId": emp["employeeId"],
                 "startDate": "2026-10-10",
                 "endDate": "2026-10-05",
                 "leaveType": "full-day",
@@ -743,13 +774,11 @@ class TestBB13SubmitLeave:
 
     def test_missing_reason_rejected(self, auth_api_client):
         """reason is required — omitting it must return 400."""
-        token = _get_auth_token(auth_api_client, "admin")
-        emp = _unique_employee()
+        token, _ = _get_linked_employee_token(auth_api_client)
 
         resp = auth_api_client.post(
             "/api/leave",
             json={
-                "employeeId": emp["employeeId"],
                 "startDate": "2026-10-01",
                 "endDate": "2026-10-02",
                 "leaveType": "full-day",
@@ -763,16 +792,12 @@ class TestBB13SubmitLeave:
         )
 
     def test_invalid_leave_type_rejected(self, auth_api_client):
-        """leaveType must be 'full-day' or 'half-day'. Invalid value must not produce 201.
-        NOTE: Mongoose enum validation surfaces as HTTP 500 (same defect pattern as BB10).
-        """
-        token = _get_auth_token(auth_api_client, "admin")
-        emp = _unique_employee()
+        """leaveType must be 'full-day' or 'half-day'. Invalid value must return 400."""
+        token, _ = _get_linked_employee_token(auth_api_client)
 
         resp = auth_api_client.post(
             "/api/leave",
             json={
-                "employeeId": emp["employeeId"],
                 "startDate": "2026-10-01",
                 "endDate": "2026-10-02",
                 "leaveType": "quarterly",
@@ -781,8 +806,8 @@ class TestBB13SubmitLeave:
             headers={"Authorization": f"Bearer {token}"},
         )
 
-        assert resp.status_code != 201, (
-            f"[BB13e] Invalid leaveType must not be accepted (201), got {resp.status_code}"
+        assert resp.status_code == 400, (
+            f"[BB13e] Invalid leaveType must produce 400, got {resp.status_code}: {resp.text}"
         )
 
 
