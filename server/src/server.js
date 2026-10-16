@@ -11,6 +11,7 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import insightRoutes from './routes/insightRoutes.js';
 import promotionRoutes from './routes/promotionRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 const allowedOrigins = [process.env.CLIENT_URL || 'http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -37,6 +38,8 @@ app.use('/api/promotions', promotionRoutes);
 app.use('/promotions', promotionRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/courses', courseRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/api/insights', insightRoutes);

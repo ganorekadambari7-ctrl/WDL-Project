@@ -1,6 +1,11 @@
 import Course from '../models/Course.js';
 import Employee from '../models/Employee.js';
 import { getLinkedEmployee } from '../middleware/auth.js';
+import {
+  notifyAdminsOnNewCourse,
+  notifyAdminsOnCertificateSubmitted,
+  notifyEmployeeOnCertificateDecision,
+} from '../utils/notificationService.js';
 
 /**
  * GET /api/courses
@@ -176,6 +181,14 @@ export const createCourse = async (req, res) => {
 
     await newCourse.save();
 
+    // Trigger Admin notifications for employee activities
+    if (req.user.role === 'employee') {
+      await notifyAdminsOnNewCourse(req.user, newCourse, targetEmployee);
+      if (hasCert) {
+        await notifyAdminsOnCertificateSubmitted(req.user, newCourse, targetEmployee);
+      }
+    }
+
     const populated = await Course.findById(newCourse._id)
       .populate('employee', 'name employeeId designation grade');
 
@@ -279,6 +292,10 @@ export const updateCourse = async (req, res) => {
 
     await course.save();
 
+    if (req.user.role === 'employee' && course.verificationStatus === 'pending_review' && course.certificateUrl) {
+      await notifyAdminsOnCertificateSubmitted(req.user, course, { name: course.employeeName, employeeId: course.employeeId });
+    }
+
     const populated = await Course.findById(course._id)
       .populate('employee', 'name employeeId designation grade')
       .populate('verifiedBy', 'name username');
@@ -325,6 +342,14 @@ export const verifyCertificate = async (req, res) => {
     const populated = await Course.findById(course._id)
       .populate('employee', 'name employeeId designation grade')
       .populate('verifiedBy', 'name username');
+
+    // Notify the employee about the verification outcome
+    await notifyEmployeeOnCertificateDecision(
+      req.user,
+      populated,
+      verificationStatus,
+      verificationRemarks
+    );
 
     res.json({
       message: `Certificate has been ${verificationStatus === 'verified' ? 'verified' : 'rejected'}.`,

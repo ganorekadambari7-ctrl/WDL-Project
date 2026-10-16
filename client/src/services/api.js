@@ -73,4 +73,11 @@ export const courseApi = {
   verify: (id, body) => request(`/courses/${id}/verify`, { method: 'PUT', body: JSON.stringify(body) }),
 };
 
+export const notificationApi = {
+  list: () => request('/notifications'),
+  markAsRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAllAsRead: () => request('/notifications/read-all', { method: 'PUT' }),
+  remove: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+};
+
 export const insightsApi = { get: () => request('/insights') };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut, Menu, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import NotificationDropdown from './NotificationDropdown';
 
 const PAGE_NAMES = {
   '/':           { title: 'Dashboard',   sub: 'Overview of your payroll activity' },
@@ -77,8 +78,11 @@ export default function Topbar({ onMenuClick }) {
         </div>
       </div>
 
-      {/* Right: user dropdown */}
-      <div style={{ position: 'relative' }} ref={dropRef}>
+      {/* Right: notifications + user dropdown */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <NotificationDropdown />
+
+        <div style={{ position: 'relative' }} ref={dropRef}>
         <button
           className="topbar-user-btn"
           onClick={() => setDropOpen((v) => !v)}
@@ -157,6 +161,7 @@ export default function Topbar({ onMenuClick }) {
           </button>
         </div>
       </div>
-    </header>
-  );
+    </div>
+  </header>
+);
 }
