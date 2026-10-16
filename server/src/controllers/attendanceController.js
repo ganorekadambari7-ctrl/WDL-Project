@@ -1,4 +1,5 @@
 import Attendance from '../models/Attendance.js';
+import { getLinkedEmployee } from '../middleware/auth.js';
 
 const monthRange = (month) => {
   const [year, value] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
@@ -29,13 +30,21 @@ export const markAttendance = async (req, res, next) => {
 
 export const getEmployeeAttendance = async (req, res, next) => {
   try {
-    const targetEmployeeId = req.params.employeeId.toUpperCase();
+    let targetEmployeeId = req.params.employeeId.toUpperCase();
 
     // RBAC: Employees can ONLY view their own attendance records
     if (req.user && req.user.role === 'employee') {
-      const userEmpId = (req.user.employeeId || '').toUpperCase();
-      if (!userEmpId || targetEmployeeId !== userEmpId) {
-        return res.status(403).json({ message: "You are not authorized to view other employees' attendance records." });
+      const emp = await getLinkedEmployee(req.user);
+      if (targetEmployeeId === 'ME') {
+        if (!emp) {
+          return res.json({ records: [], summary: { total: 0, present: 0, absent: 0, percentage: 0 }, unlinked: true });
+        }
+        targetEmployeeId = emp.employeeId.toUpperCase();
+      } else {
+        const userEmpId = emp ? emp.employeeId.toUpperCase() : (req.user.employeeId || '').toUpperCase();
+        if (!userEmpId || targetEmployeeId !== userEmpId) {
+          return res.status(403).json({ message: "You are not authorized to view other employees' attendance records." });
+        }
       }
     }
 

@@ -1,4 +1,5 @@
 import Salary from '../models/Salary.js';
+import { getLinkedEmployee } from '../middleware/auth.js';
 
 export const calculateSalary = async (req, res, next) => {
   try {
@@ -25,13 +26,19 @@ export const calculateSalary = async (req, res, next) => {
 
 export const getSalaries = async (req, res, next) => {
   try {
-    const targetEmployeeId = req.params.employeeId.toUpperCase();
+    let targetEmployeeId = req.params.employeeId.toUpperCase();
 
     // RBAC: Employees can ONLY view their own salary history
     if (req.user && req.user.role === 'employee') {
-      const userEmpId = (req.user.employeeId || '').toUpperCase();
-      if (!userEmpId || targetEmployeeId !== userEmpId) {
-        return res.status(403).json({ message: "You are not authorized to view other employees' salary records." });
+      const emp = await getLinkedEmployee(req.user);
+      if (targetEmployeeId === 'ME') {
+        if (!emp) return res.json([]);
+        targetEmployeeId = emp.employeeId.toUpperCase();
+      } else {
+        const userEmpId = emp ? emp.employeeId.toUpperCase() : (req.user.employeeId || '').toUpperCase();
+        if (!userEmpId || targetEmployeeId !== userEmpId) {
+          return res.status(403).json({ message: "You are not authorized to view other employees' salary records." });
+        }
       }
     }
 

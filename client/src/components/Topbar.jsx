@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, LogOut, Menu, Settings } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, Settings, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from './NotificationDropdown';
 
@@ -14,6 +14,7 @@ const PAGE_NAMES = {
   '/reports':    { title: 'Reports',     sub: 'Payroll and HR analytics' },
   '/insights':   { title: 'Insights',    sub: 'AI-powered payroll recommendations' },
   '/settings':   { title: 'Settings',    sub: 'Account and system preferences' },
+  '/profile':    { title: 'My Career Profile', sub: 'Employment details & career milestones' },
 };
 
 export default function Topbar({ onMenuClick }) {
@@ -139,6 +140,17 @@ export default function Topbar({ onMenuClick }) {
               {role} account
             </p>
           </div>
+
+          {role === 'employee' && (
+            <button
+              className="topbar-dropdown-item"
+              role="menuitem"
+              onClick={() => { setDropOpen(false); navigate('/profile'); }}
+            >
+              <User size={15} style={{ color: 'var(--sp-muted)' }} />
+              My Profile
+            </button>
+          )}
 
           <button
             className="topbar-dropdown-item"

@@ -75,8 +75,9 @@ export const protect = async (req, res, next) => {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await User.findById(payload.id);
     if (!req.user) return res.status(401).json({ message: 'User no longer exists.' });
-    if (req.user.role === 'employee' && !req.user.employeeId) {
-      req.user.employeeId = await getEffectiveEmployeeId(req.user);
+    if (req.user.role === 'employee') {
+      const eid = await getEffectiveEmployeeId(req.user);
+      if (eid) req.user.employeeId = eid;
     }
     next();
   } catch {

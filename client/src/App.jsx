@@ -12,6 +12,7 @@ import UmlPage from './pages/UmlPage';
 import SettingsPage from './pages/SettingsPage';
 import InsightsPage from './pages/InsightsPage';
 import LearningPage from './pages/LearningPage';
+import ProfilePage from './pages/ProfilePage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 function Protected({ children }) { return useAuth().user ? <AppLayout>{children}</AppLayout> : <Navigate to="/login" replace />; }
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/insights" element={<AdminOnly><InsightsPage/></AdminOnly>}/>
       <Route path="/uml" element={<Protected><UmlPage/></Protected>}/>
       <Route path="/settings" element={<Protected><SettingsPage/></Protected>}/>
+      <Route path="/profile" element={<Protected><ProfilePage/></Protected>}/>
       <Route path="*" element={<Navigate to="/" replace/>}/>
     </Routes>
   );

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   BarChart3, BriefcaseBusiness, CalendarCheck, ClipboardList,
-  GraduationCap, LayoutDashboard, LogOut, Settings, TrendingUp, Users, X,
+  GraduationCap, LayoutDashboard, LogOut, Settings, TrendingUp, User, Users, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,6 +39,7 @@ const NAV = [
   {
     group: 'Account',
     items: [
+      { to: '/profile',   label: 'My Profile', icon: User,            accent: '#2563EB', employeeOnly: true },
       { to: '/settings',  label: 'Settings',   icon: Settings,        accent: '#667085' },
     ],
   },
@@ -108,7 +109,11 @@ export default function Sidebar({ open, onClose }) {
         {/* Navigation list */}
         <nav className="sidebar-nav" aria-label="Main navigation">
           {NAV.map(({ group, items }) => {
-            const visibleItems = items.filter((item) => !item.adminOnly || user?.role === 'admin');
+            const visibleItems = items.filter((item) => {
+              if (item.adminOnly && user?.role !== 'admin') return false;
+              if (item.employeeOnly && user?.role !== 'employee') return false;
+              return true;
+            });
             if (visibleItems.length === 0) return null;
             return (
               <div key={group} className="sidebar-section">

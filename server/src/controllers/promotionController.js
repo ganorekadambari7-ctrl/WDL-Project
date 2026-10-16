@@ -3,6 +3,7 @@ import Employee from '../models/Employee.js';
 import Promotion from '../models/Promotion.js';
 import Department from '../models/Department.js';
 import { ensureDefaultDepartments } from './departmentController.js';
+import { getLinkedEmployee } from '../middleware/auth.js';
 
 // Multi-department default designations with numeric levels (ranks)
 const DEFAULT_DESIGNATIONS = [
@@ -357,9 +358,14 @@ export const createPromotion = async (req, res, next) => {
 /** GET /api/promotions — Admin sees all; employee sees own */
 export const getPromotions = async (req, res, next) => {
   try {
-    const filter = req.user.role === 'admin'
-      ? (req.query.employeeId ? { employeeId: req.query.employeeId.toUpperCase() } : {})
-      : { employeeId: (req.user.employeeId || '').toUpperCase() };
+    let filter = {};
+    if (req.user.role === 'admin') {
+      filter = req.query.employeeId ? { employeeId: req.query.employeeId.toUpperCase() } : {};
+    } else {
+      const emp = await getLinkedEmployee(req.user);
+      if (!emp) return res.json([]);
+      filter = { employeeId: emp.employeeId.toUpperCase() };
+    }
 
     const promotions = await Promotion.find(filter).sort({ effectiveDate: -1, createdAt: -1 });
     res.json(promotions);
@@ -369,11 +375,17 @@ export const getPromotions = async (req, res, next) => {
 /** GET /api/promotions/history/:employeeId */
 export const getEmployeePromotionHistory = async (req, res, next) => {
   try {
-    const targetEmpId = req.params.employeeId.toUpperCase();
+    let targetEmpId = req.params.employeeId.toUpperCase();
     if (req.user.role === 'employee') {
-      const userEmpId = (req.user.employeeId || '').toUpperCase();
-      if (!userEmpId || userEmpId !== targetEmpId) {
-        return res.status(403).json({ message: "You are not authorized to view other employees' promotion history." });
+      const emp = await getLinkedEmployee(req.user);
+      if (targetEmpId === 'ME') {
+        if (!emp) return res.json([]);
+        targetEmpId = emp.employeeId.toUpperCase();
+      } else {
+        const userEmpId = emp ? emp.employeeId.toUpperCase() : (req.user.employeeId || '').toUpperCase();
+        if (!userEmpId || userEmpId !== targetEmpId) {
+          return res.status(403).json({ message: "You are not authorized to view other employees' promotion history." });
+        }
       }
     }
 
