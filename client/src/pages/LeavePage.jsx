@@ -1,16 +1,288 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Clock3, Send, X } from 'lucide-react';
+import { Check, Clock, Send, X } from 'lucide-react';
 import { employeeApi, leaveApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const dateText = (value) => new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+const fmt = (v) =>
+  new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+const STATUS_BADGE = {
+  pending:  'sp-badge-amber',
+  approved: 'sp-badge-emerald',
+  rejected: 'sp-badge-rose',
+};
+
 export default function LeavePage() {
-  const { user } = useAuth(); const [employees, setEmployees] = useState([]); const [leaves, setLeaves] = useState([]); const [notice, setNotice] = useState(''); const [saving, setSaving] = useState(false); const [form, setForm] = useState({ employeeId: '', startDate: new Date().toISOString().slice(0, 10), endDate: new Date().toISOString().slice(0, 10), leaveType: 'full-day', reason: '', lateMark: false });
-  const load = async () => { try { const [employeeList, leaveList] = await Promise.all([employeeApi.list(), leaveApi.list()]); setEmployees(employeeList); setLeaves(leaveList); setForm((current) => current.employeeId ? current : { ...current, employeeId: employeeList[0]?.employeeId || '' }); } catch (error) { setNotice(error.message); } };
+  const { user } = useAuth();
+  const [employees, setEmployees] = useState([]);
+  const [leaves,    setLeaves]    = useState([]);
+  const [notice,    setNotice]    = useState({ msg: '', ok: true });
+  const [saving,    setSaving]    = useState(false);
+  const [form, setForm] = useState({
+    employeeId: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate:   new Date().toISOString().slice(0, 10),
+    leaveType: 'full-day',
+    reason:    '',
+    lateMark:  false,
+  });
+
+  const load = async () => {
+    try {
+      const [empList, leaveList] = await Promise.all([employeeApi.list(), leaveApi.list()]);
+      setEmployees(empList);
+      setLeaves(leaveList);
+      setForm((c) => c.employeeId ? c : { ...c, employeeId: empList[0]?.employeeId ?? '' });
+    } catch (e) {
+      setNotice({ msg: e.message, ok: false });
+    }
+  };
+
   useEffect(() => { load(); }, []);
-  const names = useMemo(() => Object.fromEntries(employees.map((item) => [item.employeeId, item.name])), [employees]);
-  const submit = async (event) => { event.preventDefault(); if (!form.employeeId) return setNotice('Add an employee before applying for leave.'); setSaving(true); setNotice(''); try { const leave = await leaveApi.apply(form); setLeaves((current) => [leave, ...current]); setForm((current) => ({ ...current, reason: '', lateMark: false })); setNotice('Leave request submitted.'); } catch (error) { setNotice(error.message); } finally { setSaving(false); } };
-  const review = async (id, status) => { try { const updated = await leaveApi.review(id, status); setLeaves((current) => current.map((leave) => leave._id === id ? updated : leave)); } catch (error) { setNotice(error.message); } };
-  const style = { pending: 'bg-amber-50 text-amber-700', approved: 'bg-emerald-50 text-emerald-700', rejected: 'bg-rose-50 text-rose-700' };
-  return <main className="dashboard-shell min-h-[calc(100vh-4rem)] p-5 sm:p-8"><div><p className="text-sm font-medium text-violet-700">TIME OFF</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Leave management</h1><p className="mt-2 text-sm text-slate-500">Submit leave requests and keep track of team availability.</p></div><section className="mt-7 grid gap-6 xl:grid-cols-[360px_1fr]"><form onSubmit={submit} className="chart-card h-fit p-5"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-xl bg-violet-100 text-violet-700"><Send size={20}/></div><div><h2 className="font-semibold">Apply for leave</h2><p className="text-xs text-slate-500">Create a new request</p></div></div><div className="mt-6 space-y-4"><label className="block text-sm font-medium text-slate-700">Employee<select value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="input mt-1.5">{employees.map((employee) => <option key={employee._id} value={employee.employeeId}>{employee.name} — {employee.employeeId}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label className="text-sm font-medium text-slate-700">From<input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input mt-1.5"/></label><label className="text-sm font-medium text-slate-700">To<input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="input mt-1.5"/></label></div><label className="block text-sm font-medium text-slate-700">Duration<select value={form.leaveType} onChange={(e) => setForm({ ...form, leaveType: e.target.value })} className="input mt-1.5"><option value="full-day">Full day</option><option value="half-day">Half day</option></select></label><label className="block text-sm font-medium text-slate-700">Reason<textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className="input mt-1.5 min-h-24 resize-none" placeholder="Tell us why you need leave..."/></label><label className="flex cursor-pointer items-center gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><input type="checkbox" checked={form.lateMark} onChange={(e) => setForm({ ...form, lateMark: e.target.checked })} className="size-4 accent-amber-600"/><span><b>Late mark</b><br/><span className="text-xs">Flag this request as a late arrival.</span></span></label><button disabled={saving || !employees.length} className="button-primary w-full">{saving ? 'Submitting...' : 'Submit request'}</button></div>{notice && <p className={`mt-4 rounded-lg p-3 text-sm ${notice.includes('submitted') ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{notice}</p>}</form><section className="chart-card overflow-hidden"><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="font-semibold">Leave requests</h2><p className="mt-1 text-sm text-slate-500">{leaves.filter((leave) => leave.status === 'pending').length} requests awaiting review</p></div><div className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">{leaves.length} total</div></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{['Employee','Dates','Duration','Late mark','Status','Action'].map((label) => <th key={label} className="px-5 py-3.5 font-medium">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{leaves.length ? leaves.map((leave) => <tr key={leave._id}><td className="px-5 py-4"><p className="font-medium">{names[leave.employeeId] || leave.employeeId}</p><p className="text-xs text-slate-500">{leave.employeeId}</p></td><td className="px-5 py-4 text-slate-600">{dateText(leave.startDate)}<br/>{dateText(leave.endDate)}</td><td className="px-5 py-4 capitalize text-slate-600">{leave.leaveType.replace('-', ' ')}</td><td className="px-5 py-4">{leave.lateMark ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">Yes</span> : <span className="text-slate-400">—</span>}</td><td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize ${style[leave.status]}`}>{leave.status}</span></td><td className="px-5 py-4">{user?.role === 'admin' && leave.status === 'pending' ? <div className="flex gap-2"><button onClick={() => review(leave._id, 'approved')} className="rounded-lg bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100" title="Approve"><Check size={15}/></button><button onClick={() => review(leave._id, 'rejected')} className="rounded-lg bg-rose-50 p-2 text-rose-700 hover:bg-rose-100" title="Reject"><X size={15}/></button></div> : <span className="text-xs text-slate-400">{leave.status === 'pending' ? 'Awaiting admin' : 'Reviewed'}</span>}</td></tr>) : <tr><td colSpan="6" className="px-5 py-14 text-center text-slate-500"><Clock3 className="mx-auto mb-2"/>No leave requests yet.</td></tr>}</tbody></table></div></section></section></main>;
+
+  const names = useMemo(
+    () => Object.fromEntries(employees.map((e) => [e.employeeId, e.name])),
+    [employees]
+  );
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.employeeId) return setNotice({ msg: 'Add an employee before applying for leave.', ok: false });
+    setSaving(true);
+    setNotice({ msg: '', ok: true });
+    try {
+      const leave = await leaveApi.apply(form);
+      setLeaves((cur) => [leave, ...cur]);
+      setForm((c) => ({ ...c, reason: '', lateMark: false }));
+      setNotice({ msg: 'Leave request submitted successfully.', ok: true });
+    } catch (err) {
+      setNotice({ msg: err.message, ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const review = async (id, status) => {
+    try {
+      const updated = await leaveApi.review(id, status);
+      setLeaves((cur) => cur.map((l) => (l._id === id ? updated : l)));
+    } catch (err) {
+      setNotice({ msg: err.message, ok: false });
+    }
+  };
+
+  const pendingCount = leaves.filter((l) => l.status === 'pending').length;
+
+  return (
+    <div className="sp-page">
+
+      {/* ── Page header ── */}
+      <div className="mb-7">
+        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Time Off</p>
+        <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">
+          Leave Management
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Submit leave requests and keep track of team availability.
+        </p>
+      </div>
+
+      <div className="sp-form-side">
+
+        {/* ── Apply for leave form ── */}
+        <form onSubmit={submit} className="sp-card p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <Send size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Apply for leave</h2>
+              <p className="text-xs text-slate-500">Create a new request</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Employee */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Employee</label>
+              <select
+                value={form.employeeId}
+                onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+                className="mt-1.5 sp-input"
+              >
+                {employees.map((e) => (
+                  <option key={e._id} value={e.employeeId}>
+                    {e.name} — {e.employeeId}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date range */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">From</label>
+                <input type="date" value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  className="mt-1.5 sp-input" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">To</label>
+                <input type="date" value={form.endDate}
+                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                  className="mt-1.5 sp-input" />
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Duration</label>
+              <select
+                value={form.leaveType}
+                onChange={(e) => setForm({ ...form, leaveType: e.target.value })}
+                className="mt-1.5 sp-input"
+              >
+                <option value="full-day">Full day</option>
+                <option value="half-day">Half day</option>
+              </select>
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Reason</label>
+              <textarea
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                placeholder="Briefly describe the reason for leave…"
+                rows={3}
+                className="mt-1.5 sp-input resize-none"
+              />
+            </div>
+
+            {/* Late mark checkbox */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+              <input
+                type="checkbox"
+                checked={form.lateMark}
+                onChange={(e) => setForm({ ...form, lateMark: e.target.checked })}
+                className="mt-0.5 size-4 accent-amber-600"
+              />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">Late mark</p>
+                <p className="mt-0.5 text-xs text-amber-700">Flag this as a late arrival request.</p>
+              </div>
+            </label>
+
+            <button
+              type="submit"
+              disabled={saving || !employees.length}
+              className="sp-btn-primary w-full"
+            >
+              {saving ? 'Submitting…' : 'Submit request'}
+            </button>
+          </div>
+
+          {/* Notice */}
+          {notice.msg && (
+            <p className={`mt-4 ${notice.ok ? 'sp-notice-success' : 'sp-notice-error'}`}>
+              {notice.msg}
+            </p>
+          )}
+        </form>
+
+        {/* ── Leave requests table ── */}
+        <div className="sp-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Leave requests</h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {pendingCount > 0
+                  ? `${pendingCount} request${pendingCount > 1 ? 's' : ''} awaiting review`
+                  : 'No pending requests'}
+              </p>
+            </div>
+            <span className="sp-badge-slate">{leaves.length} total</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="sp-table min-w-[740px]">
+              <thead>
+                <tr>
+                  {['Employee', 'Dates', 'Duration', 'Late mark', 'Status', 'Action'].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leaves.length ? (
+                  leaves.map((leave) => (
+                    <tr key={leave._id}>
+                      <td>
+                        <p className="font-semibold text-slate-800">
+                          {names[leave.employeeId] || leave.employeeId}
+                        </p>
+                        <p className="text-xs text-slate-400">{leave.employeeId}</p>
+                      </td>
+                      <td className="text-slate-600">
+                        <p>{fmt(leave.startDate)}</p>
+                        <p className="text-slate-400">→ {fmt(leave.endDate)}</p>
+                      </td>
+                      <td>
+                        <span className="sp-badge-slate capitalize">
+                          {leave.leaveType.replace('-', ' ')}
+                        </span>
+                      </td>
+                      <td>
+                        {leave.lateMark
+                          ? <span className="sp-badge-amber">Yes</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td>
+                        <span className={STATUS_BADGE[leave.status] ?? 'sp-badge-slate'}>
+                          {leave.status}
+                        </span>
+                      </td>
+                      <td>
+                        {user?.role === 'admin' && leave.status === 'pending' ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => review(leave._id, 'approved')}
+                              title="Approve"
+                              className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              onClick={() => review(leave._id, 'rejected')}
+                              title="Reject"
+                              className="flex size-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition hover:bg-rose-100"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            {leave.status === 'pending' ? 'Awaiting admin' : 'Reviewed'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+                        <Clock size={22} className="mb-2 text-slate-300" />
+                        <p className="text-sm text-slate-500">No leave requests yet.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

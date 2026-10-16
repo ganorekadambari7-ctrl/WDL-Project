@@ -1,15 +1,265 @@
 import { useEffect, useState } from 'react';
-import { Edit3, Plus, Search, Trash2, UsersRound } from 'lucide-react';
+import { Edit3, Plus, Search, Trash2, Users } from 'lucide-react';
 import EmployeeForm from '../components/EmployeeForm';
 import { employeeApi } from '../services/api';
 
-const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
+// Deterministic avatar color from name
+const AVATAR_COLORS = [
+  'bg-indigo-100 text-indigo-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-blue-100 text-blue-700',
+  'bg-rose-100 text-rose-700',
+  'bg-violet-100 text-violet-700',
+];
+function avatarColor(name) {
+  return AVATAR_COLORS[(name?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
+}
+function getInitials(name = '') {
+  return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function SkeletonRow() {
+  return (
+    <tr>
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-5 py-4 first:pl-6">
+          <div className="sp-skeleton h-4 w-full max-w-[120px] rounded" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [query, setQuery] = useState(''); const [selected, setSelected] = useState(null); const [open, setOpen] = useState(false); const [saving, setSaving] = useState(false);
-  const load = async () => { setLoading(true); try { setEmployees(await employeeApi.list()); } catch (err) { setError(err.message); } finally { setLoading(false); } };
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
+  const [query, setQuery]         = useState('');
+  const [selected, setSelected]   = useState(null);
+  const [open, setOpen]           = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [confirmId, setConfirmId] = useState(null); // click-twice delete
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setEmployees(await employeeApi.list());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => { load(); }, []);
-  const save = async (form) => { setSaving(true); try { const result = selected ? await employeeApi.update(selected._id, form) : await employeeApi.create(form); setEmployees((current) => selected ? current.map((item) => item._id === result._id ? result : item) : [result, ...current]); setOpen(false); } catch (err) { setError(err.message); } finally { setSaving(false); } };
-  const remove = async (employee) => { if (!window.confirm(`Delete ${employee.name}? This cannot be undone.`)) return; try { await employeeApi.remove(employee._id); setEmployees((current) => current.filter((item) => item._id !== employee._id)); } catch (err) { setError(err.message); } };
-  const shown = employees.filter((employee) => `${employee.name} ${employee.employeeId}`.toLowerCase().includes(query.toLowerCase()));
-  return <main className="dashboard-shell min-h-[calc(100vh-4rem)] p-5 sm:p-8"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-violet-700">TEAM DIRECTORY</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Employees</h1><p className="mt-2 text-sm text-slate-500">Manage employee profiles, salaries, and experience.</p></div><button onClick={() => { setSelected(null); setOpen(true); }} className="button-primary"><Plus size={17} className="mr-2"/>Add employee</button></div><section className="mt-7 chart-card overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-xl bg-violet-100 text-violet-700"><UsersRound size={21}/></div><div><p className="font-semibold">Employee directory</p><p className="text-xs text-slate-500">{employees.length} total employees</p></div></div><label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-400"><Search size={16}/><input value={query} onChange={(e) => setQuery(e.target.value)} className="w-48 bg-transparent text-sm text-slate-700 placeholder:text-slate-400" placeholder="Search employees..."/></label></div>{error && <p className="m-5 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}<div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{['Employee','Employee ID','Education','Experience','Basic salary','Actions'].map((head) => <th key={head} className="px-5 py-3.5 font-medium">{head}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{loading ? <tr><td colSpan="6" className="px-5 py-12 text-center text-slate-500">Loading employees...</td></tr> : shown.length ? shown.map((employee) => <tr key={employee._id} className="hover:bg-violet-50/30"><td className="px-5 py-4"><p className="font-medium text-slate-800">{employee.name}</p><p className="mt-0.5 text-xs text-slate-500">DOB: {new Date(employee.dob).toLocaleDateString('en-IN')}</p></td><td className="px-5 py-4 font-mono text-xs text-violet-700">{employee.employeeId}</td><td className="px-5 py-4 text-slate-600">{employee.education}</td><td className="px-5 py-4 text-slate-600">{employee.experience} yrs</td><td className="px-5 py-4 font-medium">{money.format(employee.basicSalary)}</td><td className="px-5 py-4"><div className="flex gap-2"><button onClick={() => { setSelected(employee); setOpen(true); }} className="rounded-lg p-2 text-slate-500 hover:bg-violet-100 hover:text-violet-700" aria-label="Edit"><Edit3 size={16}/></button><button onClick={() => remove(employee)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-100 hover:text-rose-700" aria-label="Delete"><Trash2 size={16}/></button></div></td></tr>) : <tr><td colSpan="6" className="px-5 py-12 text-center text-slate-500">No employees found. Add your first employee to get started.</td></tr>}</tbody></table></div></section>{open && <EmployeeForm employee={selected} onSave={save} onClose={() => setOpen(false)} saving={saving}/>}</main>;
+
+  const save = async (form) => {
+    setSaving(true);
+    setError('');
+    try {
+      const result = selected
+        ? await employeeApi.update(selected._id, form)
+        : await employeeApi.create(form);
+      setEmployees((cur) =>
+        selected
+          ? cur.map((e) => (e._id === result._id ? result : e))
+          : [result, ...cur]
+      );
+      setOpen(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (emp) => {
+    if (confirmId !== emp._id) {
+      // First click — ask for confirmation
+      setConfirmId(emp._id);
+      setTimeout(() => setConfirmId(null), 3000);
+      return;
+    }
+    // Second click — confirmed
+    setConfirmId(null);
+    try {
+      await employeeApi.remove(emp._id);
+      setEmployees((cur) => cur.filter((e) => e._id !== emp._id));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const shown = employees.filter((e) =>
+    `${e.name} ${e.employeeId} ${e.education}`.toLowerCase().includes(query.toLowerCase())
+  );
+
+  return (
+    <div className="sp-page">
+
+      {/* ── Page header ── */}
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">
+            Team Directory
+          </p>
+          <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">
+            Employees
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Manage employee profiles, salary structures, and records.
+          </p>
+        </div>
+        <button
+          onClick={() => { setSelected(null); setOpen(true); }}
+          className="sp-btn-primary"
+        >
+          <Plus size={16} />
+          Add employee
+        </button>
+      </div>
+
+      {/* ── Error notice ── */}
+      {error && (
+        <div className="mb-5">
+          <p className="sp-notice-error">{error}</p>
+        </div>
+      )}
+
+      {/* ── Table card ── */}
+      <div className="sp-card overflow-hidden">
+
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <Users size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Employee directory</p>
+              <p className="text-xs text-slate-500">
+                {loading ? 'Loading…' : `${employees.length} total employee${employees.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+          </div>
+
+          {/* Search */}
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 transition focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
+            <Search size={14} className="shrink-0 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-44 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+              placeholder="Search employees…"
+            />
+          </label>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="sp-table min-w-[820px]">
+            <thead>
+              <tr>
+                {['Employee', 'Employee ID', 'Education', 'Experience', 'Basic Salary', 'Actions'].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
+              ) : shown.length ? (
+                shown.map((emp) => (
+                  <tr key={emp._id}>
+                    {/* Employee name + DOB */}
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarColor(emp.name)}`}>
+                          {getInitials(emp.name)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-800">{emp.name}</p>
+                          <p className="text-xs text-slate-400">
+                            DOB: {new Date(emp.dob).toLocaleDateString('en-IN')}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Employee ID badge */}
+                    <td>
+                      <span className="sp-badge-indigo font-mono tracking-wider">
+                        {emp.employeeId}
+                      </span>
+                    </td>
+
+                    <td className="text-slate-600">{emp.education}</td>
+                    <td className="text-slate-600">{emp.experience} yrs</td>
+                    <td className="font-semibold text-slate-800">{INR.format(emp.basicSalary)}</td>
+
+                    {/* Actions */}
+                    <td>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => { setSelected(emp); setOpen(true); }}
+                          title="Edit"
+                          className="rounded-lg p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                        <button
+                          onClick={() => remove(emp)}
+                          title={confirmId === emp._id ? 'Click again to confirm delete' : 'Delete'}
+                          className={`rounded-lg p-2 transition ${
+                            confirmId === emp._id
+                              ? 'bg-rose-100 text-rose-600'
+                              : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                          }`}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                        {confirmId === emp._id && (
+                          <span className="text-xs font-medium text-rose-500">Confirm?</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                /* Empty state */
+                <tr>
+                  <td colSpan={6}>
+                    <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                        <Users size={24} />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700">No employees found</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {query
+                          ? 'Try a different search term.'
+                          : 'Add your first employee to get started.'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal */}
+      {open && (
+        <EmployeeForm
+          employee={selected}
+          onSave={save}
+          onClose={() => setOpen(false)}
+          saving={saving}
+        />
+      )}
+    </div>
+  );
 }

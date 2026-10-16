@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { getEffectiveEmployeeId } from '../middleware/auth.js';
 
-const allowedEmail = /^[a-zA-Z0-9._-]+@(gmail\.com|yahoo\.com|outlook\.com)$/;
+const allowedEmail = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const makeToken = (user) =>
   jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -14,7 +15,7 @@ const publicUser = (user) => ({
   email: user.email,
   role: user.role,
   department: user.department,
-  employeeId: user.employeeId,
+  employeeId: user.employeeId || (user.role === 'employee' ? `EMP-${String(user._id).slice(-6).toUpperCase()}` : undefined),
   phone: user.phone,
   jobTitle: user.jobTitle,
   dateOfJoining: user.dateOfJoining,
@@ -36,7 +37,7 @@ export const register = async (req, res, next) => {
       return res.status(400).json({ message: 'Please enter a valid name and username.' });
     }
     if (!allowedEmail.test(normalizedEmail)) {
-      return res.status(400).json({ message: 'Please enter a valid email address from Gmail, Yahoo, or Outlook.' });
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
     }
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must contain at least 6 characters.' });
@@ -47,6 +48,9 @@ export const register = async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({ name, username, email: normalizedEmail, password: hashedPassword, role });
+    if (user.role === 'employee' && !user.employeeId) {
+      user.employeeId = await getEffectiveEmployeeId(user);
+    }
     return res.status(201).json({ token: makeToken(user), user: publicUser(user) });
   } catch (error) {
     next(error);
@@ -70,6 +74,9 @@ export const login = async (req, res, next) => {
     const validPassword = user && (await bcrypt.compare(password, user.password));
     if (!validPassword || user.role !== role) {
       return res.status(401).json({ message: 'Invalid username/email or password.' });
+    }
+    if (user.role === 'employee' && !user.employeeId) {
+      user.employeeId = await getEffectiveEmployeeId(user);
     }
     return res.json({ token: makeToken(user), user: publicUser(user) });
   } catch (error) {

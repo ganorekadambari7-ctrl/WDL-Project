@@ -1,11 +1,186 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Bot, Lightbulb, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bot,
+  CheckCircle2,
+  Lightbulb,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { insightsApi } from '../services/api';
 
-const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
 export default function InsightsPage() {
-  const [data, setData] = useState(null); const [error, setError] = useState('');
-  const load = () => { setError(''); insightsApi.get().then(setData).catch((err) => setError(err.message)); };
+  const [data,    setData]    = useState(null);
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    setError('');
+    insightsApi
+      .get()
+      .then((d) => { setData(d); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
+  };
+
   useEffect(load, []);
-  return <main className="dashboard-shell min-h-[calc(100vh-4rem)] p-5 sm:p-8"><section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-fuchsia-950 to-violet-700 p-6 text-white shadow-xl shadow-violet-200 sm:p-8"><div className="flex flex-wrap items-start justify-between gap-5"><div><div className="flex items-center gap-2 text-fuchsia-200"><Sparkles size={17}/><span className="text-sm font-medium">SALARY INSIGHTS ASSISTANT</span></div><h1 className="mt-3 text-3xl font-semibold tracking-tight">Smarter payroll decisions.</h1><p className="mt-2 max-w-xl text-sm leading-6 text-violet-100">Analyze salary records and attendance patterns to spot anomalies, optimize compensation, and understand salary trends.</p></div><button onClick={load} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-violet-800 hover:bg-violet-50">Refresh insights</button></div></section>{error && <p className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}{!data ? <p className="mt-7 text-sm text-slate-500">Analyzing your payroll data...</p> : <><section className="dashboard-metrics mt-6"><article className="stat-card stat-violet"><p className="text-sm font-medium text-white/80">Average net salary</p><p className="mt-7 text-3xl font-semibold">{money.format(data.summary.averageSalary)}</p><p className="mt-1 text-xs text-white/75">Latest calculation per employee</p></article><article className="stat-card stat-emerald"><p className="text-sm font-medium text-white/80">Attendance signal</p><p className="mt-7 text-3xl font-semibold">{data.summary.attendanceRate}%</p><p className="mt-1 text-xs text-white/75">Recorded attendance rate</p></article><article className="stat-card stat-blue"><p className="text-sm font-medium text-white/80">Salary trend</p><div className="mt-7 flex items-center gap-2 text-3xl font-semibold capitalize">{data.summary.trend === 'downward' ? <TrendingDown/> : <TrendingUp/>}{data.summary.trend}</div><p className="mt-1 text-xs text-white/75">Based on saved calculations</p></article></section><section className="mt-6 grid gap-6 xl:grid-cols-2"><article className="chart-card p-5 sm:p-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-amber-100 text-amber-700"><AlertTriangle size={20}/></div><div><h2 className="font-semibold">Detected anomalies</h2><p className="mt-1 text-sm text-slate-500">Salary values outside the normal range.</p></div></div><div className="mt-6 space-y-3">{data.anomalies.length ? data.anomalies.map((item) => <div key={item.employee} className="flex items-center justify-between rounded-xl bg-slate-50 p-4"><div><p className="font-medium">{item.employee}</p><p className="text-xs text-slate-500">{item.type === 'above' ? 'Above' : 'Below'} the average salary range</p></div><p className="font-semibold text-violet-700">{money.format(item.amount)}</p></div>) : <div className="rounded-xl bg-emerald-50 p-5 text-sm text-emerald-800">No salary anomalies found yet. Add more salary calculations for a stronger comparison.</div>}</div></article><article className="chart-card p-5 sm:p-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-violet-100 text-violet-700"><Lightbulb size={20}/></div><div><h2 className="font-semibold">Optimization suggestions</h2><p className="mt-1 text-sm text-slate-500">Actionable prompts from your saved data.</p></div></div><ol className="mt-5 space-y-3">{data.suggestions.map((suggestion, index) => <li key={suggestion} className="flex gap-3 rounded-xl bg-violet-50/70 p-4 text-sm leading-6 text-slate-700"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-violet-600 text-xs font-semibold text-white">{index + 1}</span>{suggestion}</li>)}</ol></article></section><p className="mt-6 flex items-center gap-2 text-xs text-slate-500"><Bot size={15}/>Insights are computed from your local Salary Pro records. Connect an OpenAI API key later if you want natural-language analysis.</p></>}</main>;
+
+  return (
+    <div className="sp-page">
+
+      {/* ── Page header ── */}
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">
+            Salary Intelligence
+          </p>
+          <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">
+            Insights
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Analyze salary records and attendance patterns to spot anomalies and optimize compensation.
+          </p>
+        </div>
+        <button onClick={load} className="sp-btn-secondary gap-2">
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          Refresh insights
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && <p className="mb-6 sp-notice-error">{error}</p>}
+
+      {/* Loading skeleton */}
+      {loading && !data && (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="sp-skeleton h-28 w-full rounded-xl" />
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
+      {data && (
+        <>
+          {/* ── Summary stats ── */}
+          <div className="sp-metrics-grid">
+            {[
+              {
+                label: 'Average net salary',
+                value: INR.format(data.summary.averageSalary),
+                sub:   'Latest calculation per employee',
+                icon:  TrendingUp,
+                iconBg: 'bg-indigo-100 text-indigo-600',
+              },
+              {
+                label: 'Attendance signal',
+                value: `${data.summary.attendanceRate}%`,
+                sub:   'Recorded attendance rate',
+                icon:  CheckCircle2,
+                iconBg: 'bg-emerald-100 text-emerald-600',
+              },
+              {
+                label: 'Salary trend',
+                value: data.summary.trend.charAt(0).toUpperCase() + data.summary.trend.slice(1),
+                sub:   'Based on saved calculations',
+                icon:  data.summary.trend === 'downward' ? TrendingDown : TrendingUp,
+                iconBg: data.summary.trend === 'downward' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600',
+              },
+            ].map(({ label, value, sub, icon: Icon, iconBg }) => (
+              <div key={label} className="sp-card p-5">
+                <div className={`mb-4 flex size-10 items-center justify-center rounded-xl ${iconBg}`}>
+                  <Icon size={18} />
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{value}</p>
+                <p className="mt-1 text-sm font-medium text-slate-700">{label}</p>
+                <p className="mt-0.5 text-xs text-slate-400">{sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Anomalies + Suggestions ── */}
+          <div className="sp-two-col mt-6">
+
+            {/* Anomalies */}
+            <div className="sp-card">
+              <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <AlertTriangle size={17} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-800">Detected anomalies</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Salaries outside the ±35% band of the average
+                  </p>
+                </div>
+              </div>
+              <div className="p-5 space-y-3">
+                {data.anomalies.length ? (
+                  data.anomalies.map((item) => (
+                    <div
+                      key={item.employee}
+                      className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-4"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{item.employee}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {item.type === 'above' ? '▲ Above' : '▼ Below'} the average salary range
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-slate-900">{INR.format(item.amount)}</p>
+                        <span className={`text-xs font-medium ${item.type === 'above' ? 'text-indigo-600' : 'text-rose-600'}`}>
+                          {item.type}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-xl bg-emerald-50 px-6 py-8 text-center">
+                    <CheckCircle2 size={24} className="mb-2 text-emerald-500" />
+                    <p className="text-sm font-semibold text-emerald-800">No anomalies detected</p>
+                    <p className="mt-1 text-xs text-emerald-600">
+                      Add more salary calculations for a stronger comparison.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Suggestions */}
+            <div className="sp-card">
+              <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <Lightbulb size={17} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-800">Optimization suggestions</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">Actionable prompts from your data</p>
+                </div>
+              </div>
+              <ol className="divide-y divide-slate-50 p-5 space-y-0">
+                {data.suggestions.map((s, i) => (
+                  <li key={s} className="flex gap-4 py-4 first:pt-0 last:pb-0">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm leading-6 text-slate-700">{s}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          {/* Footer note */}
+          <p className="mt-6 flex items-center gap-2 text-xs text-slate-400">
+            <Bot size={14} />
+            Insights are computed from your local Salary Pro records. No external AI is used.
+          </p>
+        </>
+      )}
+    </div>
+  );
 }
