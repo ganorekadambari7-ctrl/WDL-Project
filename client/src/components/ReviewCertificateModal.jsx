@@ -56,8 +56,8 @@ export default function ReviewCertificateModal({ course, onClose, onSuccess }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-card max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card max-w-xl p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">

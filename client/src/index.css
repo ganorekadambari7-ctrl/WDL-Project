@@ -333,14 +333,14 @@
   }
 
   /* ── MODAL ── */
-  .sp-overlay {
-    @apply fixed inset-0 z-50 flex items-center justify-center p-5;
+  .sp-overlay, .sp-modal-backdrop, .modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6;
     background: rgba(23, 32, 51, 0.45);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }
-  .sp-modal {
-    @apply relative bg-white rounded-2xl overflow-y-auto w-full max-w-lg;
+  .sp-modal, .modal-card {
+    @apply relative bg-white rounded-2xl overflow-y-auto w-full max-w-xl;
     max-height: 90vh;
     box-shadow: var(--sp-shadow-lg);
   }

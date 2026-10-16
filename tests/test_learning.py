@@ -272,3 +272,104 @@ def test_admin_filters_and_course_deletion(test_setup):
     # 5. Course no longer exists
     get_res = requests.get(f"{TEST_BASE_URL}/api/courses/{c['_id']}", headers=admin["headers"])
     assert get_res.status_code == 404
+
+
+def test_admin_cannot_create_or_update_courses(test_setup):
+    """Admin cannot create courses on behalf of employees or modify self-reported progress."""
+    admin = test_setup["admin"]
+    emp1 = test_setup["emp1"]
+
+    # 1. Admin POST /api/courses -> 403
+    create_res = requests.post(
+        f"{TEST_BASE_URL}/api/courses",
+        json={"title": "Admin Created Course", "platform": "Coursera"},
+        headers=admin["headers"],
+    )
+    assert create_res.status_code == 403
+
+    # 2. Employee creates course
+    c = requests.post(
+        f"{TEST_BASE_URL}/api/courses",
+        json={"title": "Employee Course", "platform": "Udemy", "progress": 20},
+        headers=emp1["headers"],
+    ).json()
+
+    # 3. Admin PUT /api/courses/:id -> 403
+    update_res = requests.put(
+        f"{TEST_BASE_URL}/api/courses/{c['_id']}",
+        json={"progress": 80},
+        headers=admin["headers"],
+    )
+    assert update_res.status_code == 403
+
+def test_unlinked_employee_and_admin_secure_linking():
+    """Unlinked employee receives clear message; Admin can link securely with conflict prevention."""
+    # 1. Admin
+    admin_payload = _unique_user(role="admin")
+    admin_reg = requests.post(f"{TEST_BASE_URL}/api/auth/register", json=admin_payload)
+    admin_headers = {"Authorization": f"Bearer {admin_reg.json()['token']}"}
+
+    # 2. Employee doc
+    emp_doc = {
+        "name": "Jane Developer",
+        "employeeId": f"EMP{admin_payload['username'][-4:].upper()}",
+        "dob": "1996-03-12",
+        "education": "B.Sc",
+        "experience": 4,
+        "basicSalary": 75000,
+        "designation": "Frontend Engineer",
+        "grade": "L2",
+    }
+    created_emp = requests.post(f"{TEST_BASE_URL}/api/employees", json=emp_doc, headers=admin_headers).json()
+
+    # 3. Unlinked employee user registers
+    user_payload = _unique_user(role="employee")
+    user_reg = requests.post(f"{TEST_BASE_URL}/api/auth/register", json=user_payload)
+    user_token = user_reg.json()["token"]
+    user_id = user_reg.json()["user"]["id"]
+    user_headers = {"Authorization": f"Bearer {user_token}"}
+
+    # 4. Unlinked employee tries to add course -> 400
+    fail_res = requests.post(
+        f"{TEST_BASE_URL}/api/courses",
+        json={"title": "Docker Mastery", "platform": "Udemy"},
+        headers=user_headers,
+    )
+    assert fail_res.status_code == 400
+    assert "not securely linked to an employee record" in fail_res.json()["message"]
+
+    # 5. Admin lists users and sees isLinked == False
+    users_list = requests.get(f"{TEST_BASE_URL}/api/settings/users", headers=admin_headers).json()
+    target_user_info = next(u for u in users_list if str(u.get("id") or u.get("_id")) == str(user_id))
+    assert target_user_info["isLinked"] is False
+
+    # 6. Admin securely links user to employee
+    link_res = requests.put(
+        f"{TEST_BASE_URL}/api/settings/users/{user_id}/link-employee",
+        json={"employeeId": created_emp["employeeId"]},
+        headers=admin_headers,
+    )
+    assert link_res.status_code == 200
+    assert "successfully linked" in link_res.json()["message"].lower()
+
+    # 7. Another user tries to link to SAME employee -> 409 Conflict
+    other_user = _unique_user(role="employee")
+    other_reg = requests.post(f"{TEST_BASE_URL}/api/auth/register", json=other_user)
+    conflict_res = requests.put(
+        f"{TEST_BASE_URL}/api/settings/users/{other_reg.json()['user']['id']}/link-employee",
+        json={"employeeId": created_emp["employeeId"]},
+        headers=admin_headers,
+    )
+    assert conflict_res.status_code == 409
+    assert "already linked" in conflict_res.json()["message"].lower()
+
+    # 8. Now the linked employee can successfully create a course
+    success_course = requests.post(
+        f"{TEST_BASE_URL}/api/courses",
+        json={"title": "Docker Mastery", "platform": "Udemy", "progress": 10},
+        headers=user_headers,
+    )
+    assert success_course.status_code == 201
+    course_data = success_course.json()
+    assert course_data["employeeId"] == created_emp["employeeId"]
+

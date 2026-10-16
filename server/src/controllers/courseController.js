@@ -102,6 +102,12 @@ export const getCourseById = async (req, res) => {
  */
 export const createCourse = async (req, res) => {
   try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        message: 'Admins cannot create course records on behalf of employees.',
+      });
+    }
+
     const {
       title,
       platform,
@@ -124,31 +130,11 @@ export const createCourse = async (req, res) => {
 
     const numericProgress = Math.max(0, Math.min(100, Number(progress) || 0));
 
-    let targetEmployee = null;
-
-    if (req.user.role === 'employee') {
-      targetEmployee = await getLinkedEmployee(req.user);
-      if (!targetEmployee && req.user.employeeId) {
-        targetEmployee = await Employee.findOne({ employeeId: req.user.employeeId.toUpperCase() });
-      }
-      if (!targetEmployee) {
-        return res.status(400).json({
-          message: 'Your user account is not securely linked to an employee record. Please contact Admin.',
-        });
-      }
-    } else {
-      // Admin creating
-      if (req.body.employeeId) {
-        targetEmployee = await Employee.findOne({ employeeId: req.body.employeeId.toUpperCase() });
-      } else if (req.body.employee) {
-        targetEmployee = await Employee.findById(req.body.employee);
-      } else {
-        targetEmployee = await getLinkedEmployee(req.user);
-      }
-
-      if (!targetEmployee) {
-        return res.status(400).json({ message: 'Target employee could not be resolved.' });
-      }
+    const targetEmployee = await getLinkedEmployee(req.user);
+    if (!targetEmployee) {
+      return res.status(400).json({
+        message: 'Your user account is not securely linked to an employee record. Please contact Admin.',
+      });
     }
 
     // Determine status
@@ -207,23 +193,26 @@ export const createCourse = async (req, res) => {
  */
 export const updateCourse = async (req, res) => {
   try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        message: "Admins cannot modify employees' self-reported course progress. Use the verification endpoint to review certificates.",
+      });
+    }
+
     const course = await Course.findById(req.params.id);
     if (!course) {
       return res.status(404).json({ message: 'Course not found.' });
     }
 
-    const isEmployee = req.user.role === 'employee';
-    if (isEmployee) {
-      const linked = await getLinkedEmployee(req.user);
-      const userEmpId = (req.user.employeeId || linked?.employeeId || '').toUpperCase();
-      const courseEmpId = (course.employeeId || '').toUpperCase();
-      const isOwner =
-        (linked && String(course.employee) === String(linked._id)) ||
-        (userEmpId && courseEmpId === userEmpId);
+    const linked = await getLinkedEmployee(req.user);
+    const userEmpId = (req.user.employeeId || linked?.employeeId || '').toUpperCase();
+    const courseEmpId = (course.employeeId || '').toUpperCase();
+    const isOwner =
+      (linked && String(course.employee) === String(linked._id)) ||
+      (userEmpId && courseEmpId === userEmpId);
 
-      if (!isOwner) {
-        return res.status(403).json({ message: 'Access denied. You can only update your own courses.' });
-      }
+    if (!isOwner) {
+      return res.status(403).json({ message: 'Access denied. You can only update your own courses.' });
     }
 
     const {

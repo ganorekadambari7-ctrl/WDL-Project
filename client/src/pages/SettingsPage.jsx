@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { KeyRound, ShieldCheck, UserRound } from 'lucide-react';
+import { AlertCircle, CheckCircle2, KeyRound, Link2, ShieldCheck, UserRound, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { settingsApi } from '../services/api';
+import { employeeApi, settingsApi } from '../services/api';
 
 // ── Helpers (unchanged from original) ────────────────────────────────────
 const makeProfile = (user) => ({
@@ -60,17 +60,81 @@ export default function SettingsPage() {
   const [profile,   setProfile]   = useState(() => makeProfile(user));
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '' });
   const [users,     setUsers]     = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [notice,    setNotice]    = useState({ msg: '', ok: true });
   const [touched,   setTouched]   = useState({});
   const [image,     setImage]     = useState({ valid: Boolean(user?.profilePicture), error: '' });
 
+  const [linkModal, setLinkModal] = useState({
+    isOpen: false,
+    user: null,
+    selectedEmployeeId: '',
+    confirmed: false,
+    saving: false,
+    error: '',
+  });
+
   const errors = useMemo(() => validate(profile), [profile]);
 
-  // Load all users if admin
+  const loadAdminData = async () => {
+    if (user?.role !== 'admin') return;
+    try {
+      const [userList, empList] = await Promise.all([
+        settingsApi.users(),
+        employeeApi.list(),
+      ]);
+      setUsers(userList || []);
+      setEmployees(empList || []);
+    } catch (e) {
+      setNotice({ msg: e.message, ok: false });
+    }
+  };
+
   useEffect(() => {
-    if (user?.role === 'admin')
-      settingsApi.users().then(setUsers).catch((e) => setNotice({ msg: e.message, ok: false }));
+    loadAdminData();
   }, [user?.role]);
+
+  const openLinkModal = (targetUser) => {
+    const currentEid = targetUser.linkedEmployee?.employeeId || targetUser.employeeId || '';
+    setLinkModal({
+      isOpen: true,
+      user: targetUser,
+      selectedEmployeeId: currentEid,
+      confirmed: false,
+      saving: false,
+      error: '',
+    });
+  };
+
+  const handleLinkSubmit = async (e) => {
+    e.preventDefault();
+    if (!linkModal.selectedEmployeeId) {
+      return setLinkModal((c) => ({ ...c, error: 'Please select an employee record to link.' }));
+    }
+    if (!linkModal.confirmed) {
+      return setLinkModal((c) => ({ ...c, error: 'Please check the confirmation box.' }));
+    }
+
+    setLinkModal((c) => ({ ...c, saving: true, error: '' }));
+    try {
+      const res = await settingsApi.linkEmployee(
+        linkModal.user.id || linkModal.user._id,
+        linkModal.selectedEmployeeId
+      );
+      setNotice({ msg: res.message || 'User successfully linked to employee record.', ok: true });
+      setLinkModal({
+        isOpen: false,
+        user: null,
+        selectedEmployeeId: '',
+        confirmed: false,
+        saving: false,
+        error: '',
+      });
+      loadAdminData();
+    } catch (err) {
+      setLinkModal((c) => ({ ...c, saving: false, error: err.message || 'Failed to link employee.' }));
+    }
+  };
 
   const update = (key, value) => {
     setProfile((c) => ({ ...c, [key]: value }));
@@ -377,25 +441,49 @@ export default function SettingsPage() {
         </SectionCard>
       </div>
 
-      {/* ── Role management (admin only) ── */}
+      {/* ── User & Role Management (admin only) ── */}
       {user?.role === 'admin' && (
         <div className="sp-card mt-6 overflow-hidden">
-          <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-              <ShieldCheck size={18} />
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <ShieldCheck size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">User & Role Management</h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Admin-only · Assign workspace access roles and securely link employee accounts.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-slate-800">Role management</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Admin-only · Assign or change workspace access roles.
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="sp-badge-slate">{users.length} total users</span>
+              {users.filter((u) => u.role === 'employee' && !u.isLinked).length > 0 && (
+                <span className="sp-badge-amber">
+                  {users.filter((u) => u.role === 'employee' && !u.isLinked).length} unlinked
+                </span>
+              )}
             </div>
           </div>
+
+          <div className="p-6 pb-0">
+            {users.filter((u) => u.role === 'employee' && !u.isLinked).length > 0 && (
+              <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={16} className="text-amber-600 shrink-0" />
+                  <span>
+                    <strong>{users.filter((u) => u.role === 'employee' && !u.isLinked).length} employee account(s)</strong> are currently unlinked from an employee record. Link them below to enable course tracking and leave requests.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="sp-table min-w-[580px]">
+            <table className="sp-table min-w-[720px]">
               <thead>
                 <tr>
-                  {['User', 'Email', 'Current role', 'Change role'].map((h) => (
+                  {['User', 'Email', 'Role', 'Employee Record', 'Action'].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -403,34 +491,186 @@ export default function SettingsPage() {
               <tbody>
                 {users.map((member) => (
                   <tr key={member._id}>
-                    <td className="font-semibold text-slate-800">{member.name}</td>
-                    <td className="text-slate-500">{member.email}</td>
                     <td>
-                      <span className={member.role === 'admin' ? 'sp-badge-indigo' : 'sp-badge-slate'}>
-                        {member.role}
-                      </span>
+                      <p className="font-semibold text-slate-800">{member.name}</p>
+                      {member.username && <p className="text-xs text-slate-400">@{member.username}</p>}
                     </td>
+                    <td className="text-slate-500 text-xs">{member.email}</td>
                     <td>
                       <select
                         value={member.role}
                         onChange={(e) => changeRole(member._id, e.target.value)}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 capitalize focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 capitalize focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
                       >
                         <option value="employee">Employee</option>
                         <option value="admin">Admin</option>
                       </select>
                     </td>
+                    <td>
+                      {member.role === 'admin' ? (
+                        <span className="text-xs text-slate-400 italic">System Admin</span>
+                      ) : member.isLinked && member.linkedEmployee ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 size={13} className="text-emerald-600" />
+                          <span>{member.linkedEmployee.name}</span>
+                          <span className="font-mono text-[10px] text-emerald-600">({member.linkedEmployee.employeeId})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <AlertCircle size={13} className="text-amber-600" />
+                          <span>Unlinked Account</span>
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {member.role === 'employee' ? (
+                        <button
+                          type="button"
+                          onClick={() => openLinkModal(member)}
+                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                            member.isLinked
+                              ? 'border border-slate-200 text-slate-600 hover:bg-slate-100'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                          }`}
+                        >
+                          <Link2 size={13} />
+                          {member.isLinked ? 'Re-link' : 'Link Employee'}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-300">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-sm text-slate-400">
+                    <td colSpan={5} className="py-10 text-center text-sm text-slate-400">
                       No users found.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Link Employee Modal (Admin only) ── */}
+      {linkModal.isOpen && linkModal.user && (
+        <div className="modal-backdrop" onClick={() => setLinkModal((c) => ({ ...c, isOpen: false }))}>
+          <div className="modal-card max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
+                  <Link2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Link User to Employee Record</h3>
+                  <p className="text-xs text-slate-500">
+                    Explicitly link an employee user account to an official employee record.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinkModal((c) => ({ ...c, isOpen: false }))}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {linkModal.error && (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {linkModal.error}
+              </div>
+            )}
+
+            <form onSubmit={handleLinkSubmit} className="mt-4 space-y-4">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs text-slate-600">
+                <p className="font-semibold text-slate-800">Target User Account</p>
+                <p className="mt-1 text-sm font-bold text-slate-900">{linkModal.user.name}</p>
+                <p className="text-slate-500">{linkModal.user.email} {linkModal.user.username ? `• @${linkModal.user.username}` : ''}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Select Employee Record <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  required
+                  value={linkModal.selectedEmployeeId}
+                  onChange={(e) => setLinkModal((c) => ({ ...c, selectedEmployeeId: e.target.value }))}
+                  className="mt-1 sp-input text-xs"
+                >
+                  <option value="">-- Choose Employee Record --</option>
+                  {employees.map((emp) => (
+                    <option key={emp._id} value={emp.employeeId}>
+                      {emp.name} — {emp.employeeId} ({emp.department || 'IT'} • {emp.designation || 'Staff'})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Select strictly by matching employee ID and record. Never link based on names alone.
+                </p>
+              </div>
+
+              {employees.find((e) => e.employeeId === linkModal.selectedEmployeeId) && (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 text-xs text-slate-700 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Employee ID:</span>
+                    <span className="font-mono font-semibold text-indigo-700">
+                      {employees.find((e) => e.employeeId === linkModal.selectedEmployeeId)?.employeeId}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Department:</span>
+                    <span className="font-medium text-slate-800">
+                      {employees.find((e) => e.employeeId === linkModal.selectedEmployeeId)?.department || 'IT'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Designation:</span>
+                    <span className="font-medium text-slate-800">
+                      {employees.find((e) => e.employeeId === linkModal.selectedEmployeeId)?.designation || 'Staff'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <input
+                  type="checkbox"
+                  required
+                  checked={linkModal.confirmed}
+                  onChange={(e) => setLinkModal((c) => ({ ...c, confirmed: e.target.checked }))}
+                  className="mt-0.5 size-4 accent-indigo-600"
+                />
+                <div className="text-xs text-slate-600">
+                  <p className="font-semibold text-slate-800">Confirm Explicit Link</p>
+                  <p className="mt-0.5 text-slate-500">
+                    I confirm linking user account "{linkModal.user.name}" to employee record "{employees.find((e) => e.employeeId === linkModal.selectedEmployeeId)?.name || linkModal.selectedEmployeeId}".
+                  </p>
+                </div>
+              </label>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setLinkModal((c) => ({ ...c, isOpen: false }))}
+                  className="sp-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={linkModal.saving || !linkModal.confirmed || !linkModal.selectedEmployeeId}
+                  className="sp-btn-primary"
+                >
+                  {linkModal.saving ? 'Linking...' : 'Confirm & Link'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

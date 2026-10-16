@@ -185,16 +185,18 @@ export default function LearningPage() {
             <span>Refresh</span>
           </button>
 
-          <button
-            onClick={() => {
-              setCourseToEdit(null);
-              setCourseModalOpen(true);
-            }}
-            className="sp-btn sp-btn-primary flex items-center gap-1.5 text-xs"
-          >
-            <Plus size={15} />
-            <span>Add Course</span>
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => {
+                setCourseToEdit(null);
+                setCourseModalOpen(true);
+              }}
+              className="sp-btn-primary flex items-center gap-1.5 text-xs"
+            >
+              <Plus size={15} />
+              <span>Add Course</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -462,7 +464,7 @@ export default function LearningPage() {
                             </button>
                           )}
 
-                          {(!isAdmin || course.employeeId === user?.employeeId) && (
+                          {!isAdmin && (
                             <button
                               onClick={() => {
                                 setCourseToEdit(course);
@@ -492,8 +494,8 @@ export default function LearningPage() {
         )}
       </div>
 
-      {/* Course Modal (Add / Edit) */}
-      {courseModalOpen && (
+      {/* Course Modal (Add / Edit) - Employee only */}
+      {courseModalOpen && !isAdmin && (
         <CourseModal
           course={courseToEdit}
           onClose={() => {

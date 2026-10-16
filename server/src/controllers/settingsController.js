@@ -38,12 +38,35 @@ export const listUsers = async (_req, res, next) => {
   try {
     const users = await User.find().sort({ name: 1 });
     // Attach linked employee info for admin display
-    const employees = await Employee.find().select('employeeId name userId');
-    const empByUserId = Object.fromEntries(employees.filter(e => e.userId).map(e => [String(e.userId), e]));
-    const result = users.map(u => ({
-      ...publicUser(u),
-      linkedEmployee: empByUserId[String(u._id)] || null,
-    }));
+    const employees = await Employee.find().select('employeeId name userId department designation');
+    const empById = Object.fromEntries(employees.map((e) => [String(e._id), e]));
+    const empByUserId = Object.fromEntries(employees.filter((e) => e.userId).map((e) => [String(e.userId), e]));
+    const empByEid = Object.fromEntries(employees.map((e) => [e.employeeId.toUpperCase(), e]));
+
+    const result = users.map((u) => {
+      let linked = null;
+      if (u.employeeRef && empById[String(u.employeeRef)]) {
+        linked = empById[String(u.employeeRef)];
+      } else if (empByUserId[String(u._id)]) {
+        linked = empByUserId[String(u._id)];
+      } else if (u.employeeId && empByEid[u.employeeId.toUpperCase()]) {
+        linked = empByEid[u.employeeId.toUpperCase()];
+      }
+
+      return {
+        ...publicUser(u),
+        isLinked: Boolean(linked),
+        linkedEmployee: linked
+          ? {
+              _id: linked._id,
+              employeeId: linked.employeeId,
+              name: linked.name,
+              department: linked.department,
+              designation: linked.designation,
+            }
+          : null,
+      };
+    });
     res.json(result);
   } catch (error) { next(error); }
 };
@@ -67,7 +90,9 @@ export const linkEmployeeToUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found.' });
-    if (user.role !== 'employee') return res.status(400).json({ message: 'Only employee-role users can be linked to an Employee record.' });
+    if (user.role !== 'employee') {
+      return res.status(400).json({ message: 'Only employee-role users can be linked to an Employee record.' });
+    }
 
     const { employeeId, employeeObjectId } = req.body;
     let emp = null;
@@ -77,6 +102,26 @@ export const linkEmployeeToUser = async (req, res, next) => {
       emp = await Employee.findOne({ employeeId: employeeId.toUpperCase() });
     }
     if (!emp) return res.status(404).json({ message: 'Employee record not found. Check the Employee ID.' });
+
+    // Prevent duplicate or conflicting links
+    const existingLinkedUser = await User.findOne({
+      $or: [{ employeeRef: emp._id }, { employeeId: emp.employeeId.toUpperCase() }],
+      _id: { $ne: user._id },
+    });
+    if (existingLinkedUser) {
+      return res.status(409).json({
+        message: `Employee "${emp.name}" (${emp.employeeId}) is already linked to user "${existingLinkedUser.name}" (${existingLinkedUser.email}). Unlink first to prevent duplicate assignments.`,
+      });
+    }
+
+    const previousEmpForUser = await Employee.findOne({
+      userId: user._id,
+      _id: { $ne: emp._id },
+    });
+    if (previousEmpForUser) {
+      previousEmpForUser.userId = undefined;
+      await previousEmpForUser.save();
+    }
 
     // Update User
     user.employeeId = emp.employeeId.toUpperCase();

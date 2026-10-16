@@ -14,9 +14,9 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/', getCourses);
-router.post('/', createCourse);
+router.post('/', authorize('employee'), createCourse);
 router.get('/:id', getCourseById);
-router.put('/:id', updateCourse);
+router.put('/:id', authorize('employee'), updateCourse);
 router.delete('/:id', deleteCourse);
 
 // Admin only verification endpoint
