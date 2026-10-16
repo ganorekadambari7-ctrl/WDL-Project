@@ -51,4 +51,14 @@ export const settingsApi = {
     request(`/settings/users/${userId}/link-employee`, { method: 'PUT', body: JSON.stringify({ employeeId }) }),
 };
 
+export const promotionApi = {
+  list: (employeeId) => request(`/promotions${employeeId ? `?employeeId=${employeeId}` : ''}`),
+  getByEmployee: (employeeId) => request(`/promotions/history/${employeeId}`),
+  promote: (body) => request('/promotions', { method: 'POST', body: JSON.stringify(body) }),
+  designations: () => request('/promotions/designations'),
+  createDesignation: (body) => request('/promotions/designations', { method: 'POST', body: JSON.stringify(body) }),
+  updateDesignation: (id, body) => request(`/promotions/designations/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  getApplicableSalary: (employeeId, month) => request(`/promotions/applicable-rate/${employeeId}${month ? `?month=${month}` : ''}`),
+};
+
 export const insightsApi = { get: () => request('/insights') };

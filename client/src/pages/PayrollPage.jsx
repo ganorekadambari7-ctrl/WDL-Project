@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calculator, Download, Minus, Plus } from 'lucide-react';
-import { employeeApi, salaryApi } from '../services/api';
+import { ArrowRight, Calendar, Calculator, Download, History, Info, Minus, Plus, TrendingUp } from 'lucide-react';
+import { employeeApi, promotionApi, salaryApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { downloadPayslip } from '../utils/payslipPdf';
 
 const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 const INITIAL = { employeeId: '', basicSalary: 0, bonus: 0, taxDeduction: 0, lateMarkDeduction: 0 };
+
+const currentMonthStr = new Date().toISOString().slice(0, 7);
 
 // Salary inputs config (admin calculator)
 const INPUTS = [
@@ -21,6 +23,7 @@ const INPUTS = [
 function EmployeePayrollView() {
   const { user } = useAuth();
   const [history, setHistory] = useState([]);
+  const [promotions, setPromotions] = useState([]);
   const [myEmployee, setMyEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,14 +32,17 @@ function EmployeePayrollView() {
     const load = async () => {
       setLoading(true);
       try {
-        // Resolve own employee record
         let emp = null;
         try { emp = await employeeApi.me(); } catch { /* not linked yet */ }
         setMyEmployee(emp);
 
         if (emp?.employeeId) {
-          const hist = await salaryApi.getByEmployee(emp.employeeId);
+          const [hist, promos] = await Promise.all([
+            salaryApi.getByEmployee(emp.employeeId),
+            promotionApi.getByEmployee(emp.employeeId).catch(() => []),
+          ]);
           setHistory(hist);
+          setPromotions(promos);
         }
       } catch (e) {
         setError(e.message);
@@ -54,8 +60,8 @@ function EmployeePayrollView() {
       {/* Header */}
       <div className="mb-7">
         <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Payroll Studio</p>
-        <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">My Salary</h1>
-        <p className="mt-1 text-sm text-slate-500">Your personal salary details and payslip history.</p>
+        <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">My Salary &amp; Payslips</h1>
+        <p className="mt-1 text-sm text-slate-500">Your personal salary details, designation, and payslip history.</p>
       </div>
 
       {error && <p className="sp-notice-error mb-5">{error}</p>}
@@ -68,8 +74,8 @@ function EmployeePayrollView() {
               <Calculator size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">My Payroll Details</h2>
-              <p className="text-xs text-slate-500">Salary information for your account</p>
+              <h2 className="text-sm font-semibold text-slate-800">My Payroll Profile</h2>
+              <p className="text-xs text-slate-500">Current designation and salary configuration</p>
             </div>
           </div>
 
@@ -80,16 +86,30 @@ function EmployeePayrollView() {
           ) : myEmployee ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Employee</p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">{myEmployee.name}</p>
-                <p className="text-xs font-mono text-indigo-600">{myEmployee.employeeId}</p>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Employee Details</p>
+                    <p className="mt-1 text-base font-semibold text-slate-800">{myEmployee.name}</p>
+                    <p className="text-xs font-mono text-indigo-600">{myEmployee.employeeId}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="sp-badge-indigo text-xs">
+                      {myEmployee.designation || 'Standard Employee'}
+                    </span>
+                    {myEmployee.grade && (
+                      <p className="text-[11px] font-mono font-semibold text-slate-500 mt-1">
+                        Grade {myEmployee.grade}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {latest ? (
                 <>
                   <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Latest Basic Salary</p>
-                    <p className="mt-1 text-lg font-bold text-slate-900">{INR.format(latest.basicSalary)}</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900">{INR.format(latest.basicSalary)}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
@@ -105,8 +125,8 @@ function EmployeePayrollView() {
               ) : (
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-6 text-center">
                   <Calculator size={24} className="mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm text-slate-500">Salary not available yet.</p>
-                  <p className="mt-1 text-xs text-slate-400">Contact your administrator for salary information.</p>
+                  <p className="text-sm font-semibold text-slate-700">Salary not available yet.</p>
+                  <p className="mt-1 text-xs text-slate-400">Your payroll has not been generated yet for this period. Contact your administrator for assistance.</p>
                 </div>
               )}
             </div>
@@ -118,7 +138,7 @@ function EmployeePayrollView() {
           )}
         </div>
 
-        {/* Right: net salary card */}
+        {/* Right: net salary breakdown */}
         {latest && (
           <div className="flex flex-col gap-5">
             <div className="sp-card overflow-hidden">
@@ -165,11 +185,69 @@ function EmployeePayrollView() {
         </div>
       )}
 
+      {/* My Promotion History */}
+      {promotions.length > 0 && (
+        <div className="sp-card mt-6 overflow-hidden">
+          <div className="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">My Promotion &amp; Grade History</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Official record of approved designations and salary revisions</p>
+            </div>
+            <span className="sp-badge-indigo">{promotions.length} total</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="sp-table min-w-[620px]">
+              <thead>
+                <tr>
+                  <th>Effective Date</th>
+                  <th>Designation Transition</th>
+                  <th>Salary Revision</th>
+                  <th>Increment</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {promotions.map((p) => (
+                  <tr key={p._id}>
+                    <td className="text-xs font-medium text-slate-700">
+                      {new Date(p.effectiveDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-slate-500">{p.previousDesignation}</span>
+                        <ArrowRight size={11} className="text-slate-400" />
+                        <span className="font-semibold text-indigo-700">{p.newDesignation}</span>
+                        {p.newGrade && <span className="sp-badge-slate text-[10px]">{p.newGrade}</span>}
+                      </div>
+                    </td>
+                    <td className="text-xs">
+                      <span className="text-slate-400">{INR.format(p.previousSalary)}</span>
+                      <span className="mx-1 text-slate-400">→</span>
+                      <span className="font-semibold text-slate-800">{INR.format(p.newSalary)}</span>
+                    </td>
+                    <td>
+                      <span className={`sp-badge-${p.incrementPercentage >= 0 ? 'emerald' : 'rose'} text-xs font-semibold`}>
+                        {p.incrementPercentage >= 0 ? `+${p.incrementPercentage}%` : `${p.incrementPercentage}%`}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`text-xs font-semibold capitalize ${p.status === 'applied' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Salary history */}
       <div className="sp-card mt-6 overflow-hidden">
         <div className="border-b border-slate-100 px-6 py-4">
-          <h2 className="text-sm font-semibold text-slate-800">My salary history</h2>
-          <p className="mt-0.5 text-xs text-slate-500">All past salary calculations for your account</p>
+          <h2 className="text-sm font-semibold text-slate-800">My Salary History</h2>
+          <p className="mt-0.5 text-xs text-slate-500">Historical payroll records calculated for your profile</p>
         </div>
         <div className="overflow-x-auto">
           <table className="sp-table min-w-[680px]">
@@ -214,14 +292,16 @@ function EmployeePayrollView() {
 }
 
 // ────────────────────────────────────────────────
-// Admin calculator view (unchanged from original)
+// Admin calculator view with Promotion Awareness
 // ────────────────────────────────────────────────
 function AdminPayrollView() {
   const [employees, setEmployees] = useState([]);
   const [history,   setHistory]   = useState([]);
+  const [month,     setMonth]     = useState(currentMonthStr);
   const [form,      setForm]      = useState(INITIAL);
   const [notice,    setNotice]    = useState({ msg: '', ok: true });
   const [saving,    setSaving]    = useState(false);
+  const [prorationInfo, setProrationInfo] = useState(null);
 
   const selected = employees.find((e) => e.employeeId === form.employeeId);
 
@@ -237,29 +317,50 @@ function AdminPayrollView() {
     [form]
   );
 
+  // Load employees
   useEffect(() => {
     employeeApi.list()
       .then((list) => {
         setEmployees(list);
-        if (list[0])
-          setForm((c) =>
-            c.employeeId ? c : { ...c, employeeId: list[0].employeeId, basicSalary: list[0].basicSalary }
-          );
+        if (list[0]) {
+          const firstId = list[0].employeeId;
+          setForm((c) => ({ ...c, employeeId: firstId }));
+          fetchApplicableRate(firstId, month);
+        }
       })
       .catch((e) => setNotice({ msg: e.message, ok: false }));
   }, []);
 
+  // Fetch applicable rate based on promotion & effective date
+  const fetchApplicableRate = async (empId, targetMonth) => {
+    if (!empId) return;
+    try {
+      const data = await promotionApi.getApplicableSalary(empId, targetMonth);
+      setForm((c) => ({ ...c, basicSalary: data.baseSalary }));
+      setProrationInfo(data.isProrated ? data.proration : null);
+    } catch {
+      // Fallback to employee's stored basicSalary if promotion rate lookup fails
+      const emp = employees.find((e) => e.employeeId === empId);
+      if (emp) setForm((c) => ({ ...c, basicSalary: emp.basicSalary ?? 0 }));
+      setProrationInfo(null);
+    }
+  };
+
+  // When employee or month changes, update history & applicable rate
   useEffect(() => {
-    if (form.employeeId)
+    if (form.employeeId) {
       salaryApi
         .getByEmployee(form.employeeId)
         .then(setHistory)
         .catch((e) => setNotice({ msg: e.message, ok: false }));
-  }, [form.employeeId]);
+
+      fetchApplicableRate(form.employeeId, month);
+    }
+  }, [form.employeeId, month]);
 
   const chooseEmployee = (id) => {
-    const emp = employees.find((e) => e.employeeId === id);
-    setForm({ ...form, employeeId: id, basicSalary: emp?.basicSalary ?? 0 });
+    setForm({ ...form, employeeId: id });
+    fetchApplicableRate(id, month);
   };
 
   const change = (key, value) => setForm((c) => ({ ...c, [key]: value }));
@@ -272,7 +373,7 @@ function AdminPayrollView() {
     try {
       const salary = await salaryApi.calculate(form);
       setHistory((cur) => [salary, ...cur]);
-      setNotice({ msg: 'Salary calculated and saved.', ok: true });
+      setNotice({ msg: 'Salary calculated and saved successfully.', ok: true });
     } catch (err) {
       setNotice({ msg: err.message, ok: false });
     } finally {
@@ -288,36 +389,73 @@ function AdminPayrollView() {
       <div className="mb-7">
         <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Payroll Studio</p>
         <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">Salary Calculation</h1>
-        <p className="mt-1 text-sm text-slate-500">Calculate take-home pay and generate professional payslips.</p>
+        <p className="mt-1 text-sm text-slate-500">Calculate take-home pay, apply promotions, and generate professional payslips.</p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <form onSubmit={save} className="sp-card p-6">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-              <Calculator size={18} />
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <Calculator size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">Salary inputs</h2>
+                <p className="text-xs text-slate-500">Earnings + bonuses − deductions</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-slate-800">Salary inputs</h2>
-              <p className="text-xs text-slate-500">Earnings + bonuses − deductions</p>
+            {/* Payroll Month Selector */}
+            <div className="flex items-center gap-2">
+              <Calendar size={14} className="text-slate-400" />
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-indigo-400 focus:outline-none"
+              />
             </div>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700">Employee</label>
+          {/* Employee picker & Designation strip */}
+          <div className="mb-6 space-y-2">
+            <label className="block text-sm font-medium text-slate-700">Select Employee</label>
             <select
               value={form.employeeId}
               onChange={(e) => chooseEmployee(e.target.value)}
-              className="mt-1.5 sp-input"
+              className="sp-input"
             >
               {employees.map((e) => (
                 <option key={e._id} value={e.employeeId}>
-                  {e.name} — {e.employeeId}
+                  {e.name} — {e.employeeId} {e.designation ? `(${e.designation})` : ''}
                 </option>
               ))}
             </select>
+            {selected && (
+              <div className="flex items-center justify-between text-xs text-slate-500 px-1 pt-1">
+                <span>Designation: <strong className="text-slate-700">{selected.designation || 'Standard'}</strong></span>
+                <span>Grade: <strong className="text-slate-700">{selected.grade || '—'}</strong></span>
+              </div>
+            )}
           </div>
 
+          {/* Mid-Month Proration Notice */}
+          {prorationInfo && (
+            <div className="mb-5 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 text-xs text-indigo-900 leading-relaxed">
+              <div className="flex items-center gap-2 font-semibold text-indigo-800 mb-1">
+                <TrendingUp size={14} />
+                <span>Automated Mid-Month Proration Applied</span>
+              </div>
+              <p>
+                Promotion takes effect on <strong>day {prorationInfo.promoDay}</strong> of this month.
+                Basic salary is automatically calculated for {prorationInfo.daysOld} days at {INR.format(prorationInfo.oldSalary)} and {prorationInfo.daysNew} days at {INR.format(prorationInfo.newSalary)}.
+              </p>
+              <p className="mt-1 font-mono text-[11px] text-indigo-700 bg-white/70 p-1.5 rounded border border-indigo-100">
+                Formula: {prorationInfo.formula}
+              </p>
+            </div>
+          )}
+
+          {/* Earnings section */}
           <div className="mb-4">
             <div className="mb-3 flex items-center gap-2">
               <Plus size={13} className="text-emerald-600" />
@@ -339,6 +477,7 @@ function AdminPayrollView() {
             </div>
           </div>
 
+          {/* Deductions section */}
           <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-4">
             <div className="mb-3 flex items-center gap-2">
               <Minus size={13} className="text-rose-600" />

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Edit3, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Edit3, History, Layers, Plus, Search, Trash2, TrendingUp, Users } from 'lucide-react';
 import EmployeeForm from '../components/EmployeeForm';
+import PromotionModal from '../components/PromotionModal';
+import PromotionHistoryModal from '../components/PromotionHistoryModal';
+import DesignationsModal from '../components/DesignationsModal';
 import { employeeApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -45,6 +48,11 @@ export default function EmployeesPage() {
   const [open, setOpen]           = useState(false);
   const [saving, setSaving]       = useState(false);
   const [confirmId, setConfirmId] = useState(null);
+
+  // Promotion modals state
+  const [promoteEmp, setPromoteEmp] = useState(null);
+  const [historyEmp, setHistoryEmp] = useState(null);
+  const [showDesignations, setShowDesignations] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -96,11 +104,14 @@ export default function EmployeesPage() {
     }
   };
 
+  const handlePromotionSuccess = () => {
+    load(); // Refresh employees so updated designation/salary shows immediately
+  };
+
   const shown = employees.filter((e) =>
-    `${e.name} ${e.employeeId} ${e.education}`.toLowerCase().includes(query.toLowerCase())
+    `${e.name} ${e.employeeId} ${e.designation || ''} ${e.education}`.toLowerCase().includes(query.toLowerCase())
   );
 
-  // Number of table columns depends on role
   const colCount = isAdmin ? 6 : 5;
 
   return (
@@ -113,19 +124,30 @@ export default function EmployeesPage() {
           <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">Employees</h1>
           <p className="mt-1 text-sm text-slate-500">
             {isAdmin
-              ? 'Manage employee profiles, salary structures, and records.'
+              ? 'Manage employee profiles, designations, promotions, and salary structures.'
               : 'View the company employee directory.'}
           </p>
         </div>
-        {/* Add employee button — admin only */}
+
+        {/* Admin toolbar buttons */}
         {isAdmin && (
-          <button
-            onClick={() => { setSelected(null); setOpen(true); }}
-            className="sp-btn-primary"
-          >
-            <Plus size={16} />
-            Add employee
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setShowDesignations(true)}
+              className="sp-btn-secondary"
+              title="Configure salary grades & designations"
+            >
+              <Layers size={16} />
+              Salary Grades
+            </button>
+            <button
+              onClick={() => { setSelected(null); setOpen(true); }}
+              className="sp-btn-primary"
+            >
+              <Plus size={16} />
+              Add employee
+            </button>
+          </div>
         )}
       </div>
 
@@ -158,18 +180,18 @@ export default function EmployeesPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-44 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
-              placeholder="Search employees…"
+              className="w-52 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+              placeholder="Search by name, ID, role…"
             />
           </label>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="sp-table min-w-[820px]">
+          <table className="sp-table min-w-[860px]">
             <thead>
               <tr>
-                {['Employee', 'Employee ID', 'Education', 'Experience', 'Basic Salary',
+                {['Employee', 'Employee ID', 'Designation & Grade', 'Experience', 'Basic Salary',
                   ...(isAdmin ? ['Actions'] : [])
                 ].map((h) => (
                   <th key={h}>{h}</th>
@@ -202,25 +224,56 @@ export default function EmployeesPage() {
                       <span className="sp-badge-indigo font-mono tracking-wider">{emp.employeeId}</span>
                     </td>
 
-                    <td className="text-slate-600">{emp.education}</td>
+                    {/* Designation & Grade */}
+                    <td>
+                      <div>
+                        <p className="font-medium text-slate-800 text-xs">{emp.designation || 'Unassigned'}</p>
+                        {emp.grade ? (
+                          <span className="sp-badge-slate text-[10px] font-mono mt-0.5 inline-block">
+                            Grade {emp.grade}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Standard</span>
+                        )}
+                      </div>
+                    </td>
+
                     <td className="text-slate-600">{emp.experience} yrs</td>
                     <td className="font-semibold text-slate-800">{INR.format(emp.basicSalary)}</td>
 
                     {/* Actions — admin only */}
                     {isAdmin && (
                       <td>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
+                          {/* Promote Button */}
+                          <button
+                            onClick={() => setPromoteEmp(emp)}
+                            title="Promote & revise salary"
+                            className="rounded-lg p-1.5 text-indigo-600 transition hover:bg-indigo-50"
+                          >
+                            <TrendingUp size={15} />
+                          </button>
+                          {/* Promotion History Button */}
+                          <button
+                            onClick={() => setHistoryEmp(emp)}
+                            title="View promotion history"
+                            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            <History size={15} />
+                          </button>
+                          {/* Edit Button */}
                           <button
                             onClick={() => { setSelected(emp); setOpen(true); }}
                             title="Edit"
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
                           >
                             <Edit3 size={15} />
                           </button>
+                          {/* Delete Button */}
                           <button
                             onClick={() => remove(emp)}
                             title={confirmId === emp._id ? 'Click again to confirm delete' : 'Delete'}
-                            className={`rounded-lg p-2 transition ${
+                            className={`rounded-lg p-1.5 transition ${
                               confirmId === emp._id
                                 ? 'bg-rose-100 text-rose-600'
                                 : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
@@ -229,7 +282,7 @@ export default function EmployeesPage() {
                             <Trash2 size={15} />
                           </button>
                           {confirmId === emp._id && (
-                            <span className="text-xs font-medium text-rose-500">Confirm?</span>
+                            <span className="text-[11px] font-medium text-rose-500 ml-1">Confirm?</span>
                           )}
                         </div>
                       </td>
@@ -260,13 +313,38 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Modal — admin only */}
+      {/* Edit / Add Modal */}
       {isAdmin && open && (
         <EmployeeForm
           employee={selected}
           onSave={save}
           onClose={() => setOpen(false)}
           saving={saving}
+        />
+      )}
+
+      {/* Promote Modal */}
+      {isAdmin && promoteEmp && (
+        <PromotionModal
+          employee={promoteEmp}
+          onClose={() => setPromoteEmp(null)}
+          onSuccess={handlePromotionSuccess}
+        />
+      )}
+
+      {/* Promotion History Modal */}
+      {historyEmp && (
+        <PromotionHistoryModal
+          employee={historyEmp}
+          onClose={() => setHistoryEmp(null)}
+        />
+      )}
+
+      {/* Designations Management Modal */}
+      {isAdmin && showDesignations && (
+        <DesignationsModal
+          onClose={() => setShowDesignations(false)}
+          onUpdated={load}
         />
       )}
     </div>
