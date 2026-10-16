@@ -61,4 +61,16 @@ export const promotionApi = {
   getApplicableSalary: (employeeId, month) => request(`/promotions/applicable-rate/${employeeId}${month ? `?month=${month}` : ''}`),
 };
 
+export const courseApi = {
+  list: (params) => {
+    const q = params ? new URLSearchParams(Object.entries(params).filter(([_, v]) => v !== undefined && v !== '')).toString() : '';
+    return request(`/courses${q ? `?${q}` : ''}`);
+  },
+  get: (id) => request(`/courses/${id}`),
+  create: (body) => request('/courses', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/courses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (id) => request(`/courses/${id}`, { method: 'DELETE' }),
+  verify: (id, body) => request(`/courses/${id}/verify`, { method: 'PUT', body: JSON.stringify(body) }),
+};
+
 export const insightsApi = { get: () => request('/insights') };

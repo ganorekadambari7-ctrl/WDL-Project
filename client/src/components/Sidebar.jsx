@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   BarChart3, BriefcaseBusiness, CalendarCheck, ClipboardList,
-  LayoutDashboard, LogOut, Settings, TrendingUp, Users, X,
+  GraduationCap, LayoutDashboard, LogOut, Settings, TrendingUp, Users, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,6 +20,7 @@ const NAV = [
       { to: '/employees', label: 'Employees',  icon: Users,           accent: '#2563EB', adminOnly: true },
       { to: '/attendance',label: 'Attendance', icon: CalendarCheck,   accent: '#0F9F8F' },
       { to: '/leaves',    label: 'Leave',      icon: ClipboardList,   accent: '#F4B740' },
+      { to: '/learning',  label: 'Learning',   icon: GraduationCap,   accent: '#8B5CF6' },
     ],
   },
   {

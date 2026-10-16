@@ -8,6 +8,7 @@ const PAGE_NAMES = {
   '/employees':  { title: 'Employees',   sub: 'Manage your workforce' },
   '/attendance': { title: 'Attendance',  sub: 'Track daily attendance records' },
   '/leaves':     { title: 'Leave',       sub: 'Review and manage leave requests' },
+  '/learning':   { title: 'Learning & Development', sub: 'Track employee courses and certifications' },
   '/payroll':    { title: 'Salary',      sub: 'Process and review payroll' },
   '/reports':    { title: 'Reports',     sub: 'Payroll and HR analytics' },
   '/insights':   { title: 'Insights',    sub: 'AI-powered payroll recommendations' },

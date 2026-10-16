@@ -10,6 +10,7 @@ import salaryRoutes from './routes/salaryRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import insightRoutes from './routes/insightRoutes.js';
 import promotionRoutes from './routes/promotionRoutes.js';
+import courseRoutes from './routes/courseRoutes.js';
 
 const app = express();
 const allowedOrigins = [process.env.CLIENT_URL || 'http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -17,7 +18,8 @@ app.use(cors({ origin: (origin, callback) => {
   if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
   callback(new Error('CORS origin not allowed'));
 }}));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
@@ -33,6 +35,8 @@ app.use('/api/salary', salaryRoutes);
 app.use('/salary', salaryRoutes);
 app.use('/api/promotions', promotionRoutes);
 app.use('/promotions', promotionRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/courses', courseRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/api/insights', insightRoutes);
