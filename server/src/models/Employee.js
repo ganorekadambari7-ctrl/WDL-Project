@@ -8,6 +8,7 @@ const employeeSchema = new mongoose.Schema(
     education: { type: String, required: true, trim: true },
     experience: { type: Number, required: true, min: 0, max: 70 },
     basicSalary: { type: Number, required: true, min: 0 },
+    department: { type: String, trim: true, default: 'IT' },
     designation: { type: String, trim: true, default: 'Unassigned' },
     grade: { type: String, trim: true, uppercase: true, default: '' },
     designationRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Designation' },

@@ -54,11 +54,19 @@ export const settingsApi = {
 export const promotionApi = {
   list: (employeeId) => request(`/promotions${employeeId ? `?employeeId=${employeeId}` : ''}`),
   getByEmployee: (employeeId) => request(`/promotions/history/${employeeId}`),
+  getEligible: (employeeId) => request(`/promotions/eligible/${employeeId}`),
   promote: (body) => request('/promotions', { method: 'POST', body: JSON.stringify(body) }),
-  designations: () => request('/promotions/designations'),
+  designations: (dept) => request(`/promotions/designations${dept ? `?department=${encodeURIComponent(dept)}` : ''}`),
   createDesignation: (body) => request('/promotions/designations', { method: 'POST', body: JSON.stringify(body) }),
   updateDesignation: (id, body) => request(`/promotions/designations/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   getApplicableSalary: (employeeId, month) => request(`/promotions/applicable-rate/${employeeId}${month ? `?month=${month}` : ''}`),
+};
+
+export const departmentApi = {
+  list: (all = false) => request(`/departments${all ? '?all=true' : ''}`),
+  create: (body) => request('/departments', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/departments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (id) => request(`/departments/${id}`, { method: 'DELETE' }),
 };
 
 export const courseApi = {

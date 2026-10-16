@@ -4,7 +4,7 @@ import EmployeeForm from '../components/EmployeeForm';
 import PromotionModal from '../components/PromotionModal';
 import PromotionHistoryModal from '../components/PromotionHistoryModal';
 import DesignationsModal from '../components/DesignationsModal';
-import { employeeApi } from '../services/api';
+import { employeeApi, departmentApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
@@ -40,14 +40,16 @@ export default function EmployeesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState('');
-  const [query, setQuery]         = useState('');
-  const [selected, setSelected]   = useState(null);
-  const [open, setOpen]           = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [confirmId, setConfirmId] = useState(null);
+  const [employees, setEmployees]     = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [selectedDept, setSelectedDept] = useState('all');
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState('');
+  const [query, setQuery]             = useState('');
+  const [selected, setSelected]       = useState(null);
+  const [open, setOpen]               = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [confirmId, setConfirmId]     = useState(null);
 
   // Promotion modals state
   const [promoteEmp, setPromoteEmp] = useState(null);
@@ -57,7 +59,12 @@ export default function EmployeesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setEmployees(await employeeApi.list());
+      const [empList, deptList] = await Promise.all([
+        employeeApi.list(),
+        departmentApi.list(),
+      ]);
+      setEmployees(empList);
+      setDepartments(deptList);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -108,11 +115,15 @@ export default function EmployeesPage() {
     load(); // Refresh employees so updated designation/salary shows immediately
   };
 
-  const shown = employees.filter((e) =>
-    `${e.name} ${e.employeeId} ${e.designation || ''} ${e.education}`.toLowerCase().includes(query.toLowerCase())
-  );
+  const shown = employees.filter((e) => {
+    const matchesDept = selectedDept === 'all' || (e.department || 'IT') === selectedDept;
+    const matchesQuery = `${e.name} ${e.employeeId} ${e.department || ''} ${e.designation || ''} ${e.education}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+    return matchesDept && matchesQuery;
+  });
 
-  const colCount = isAdmin ? 6 : 5;
+  const colCount = isAdmin ? 7 : 6;
 
   return (
     <div className="sp-page">
@@ -124,7 +135,7 @@ export default function EmployeesPage() {
           <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">Employees</h1>
           <p className="mt-1 text-sm text-slate-500">
             {isAdmin
-              ? 'Manage employee profiles, designations, promotions, and salary structures.'
+              ? 'Manage employee profiles, departments, designations, promotions, and salary structures.'
               : 'View the company employee directory.'}
           </p>
         </div>
@@ -135,10 +146,10 @@ export default function EmployeesPage() {
             <button
               onClick={() => setShowDesignations(true)}
               className="sp-btn-secondary"
-              title="Configure salary grades & designations"
+              title="Configure departments, salary grades & designations"
             >
               <Layers size={16} />
-              Salary Grades
+              Departments &amp; Grades
             </button>
             <button
               onClick={() => { setSelected(null); setOpen(true); }}
@@ -174,16 +185,29 @@ export default function EmployeesPage() {
             </div>
           </div>
 
-          {/* Search */}
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 transition focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
-            <Search size={14} className="shrink-0 text-slate-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-52 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
-              placeholder="Search by name, ID, role…"
-            />
-          </label>
+          {/* Department Filter & Search */}
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="sp-input text-xs py-2 w-40"
+            >
+              <option value="all">All Departments</option>
+              {departments.map((d) => (
+                <option key={d._id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+
+            <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 transition focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
+              <Search size={14} className="shrink-0 text-slate-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-48 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+                placeholder="Search name, ID, role…"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Table */}
@@ -191,7 +215,7 @@ export default function EmployeesPage() {
           <table className="sp-table min-w-[860px]">
             <thead>
               <tr>
-                {['Employee', 'Employee ID', 'Designation & Grade', 'Experience', 'Basic Salary',
+                {['Employee', 'Employee ID', 'Department', 'Designation & Grade', 'Experience', 'Basic Salary',
                   ...(isAdmin ? ['Actions'] : [])
                 ].map((h) => (
                   <th key={h}>{h}</th>
@@ -222,6 +246,13 @@ export default function EmployeesPage() {
                     {/* Employee ID */}
                     <td>
                       <span className="sp-badge-indigo font-mono tracking-wider">{emp.employeeId}</span>
+                    </td>
+
+                    {/* Department */}
+                    <td>
+                      <span className="inline-block rounded px-2.5 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {emp.department || 'IT'}
+                      </span>
                     </td>
 
                     {/* Designation & Grade */}
