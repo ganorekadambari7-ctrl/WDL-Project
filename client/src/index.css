@@ -172,8 +172,9 @@
   }
 
   /* ── CARD HIERARCHY SYSTEM ── */
-  /* Standard content panel */
-  .sp-panel {
+  /* Standard content panel & card */
+  .sp-panel,
+  .sp-card {
     background: var(--sp-surface);
     border: 1px solid var(--sp-border);
     border-radius: var(--sp-r-lg);
