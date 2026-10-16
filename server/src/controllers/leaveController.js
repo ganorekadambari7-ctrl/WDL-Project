@@ -1,30 +1,41 @@
 import Leave from '../models/Leave.js';
+import { getEffectiveEmployeeId } from '../middleware/auth.js';
 
 export const applyLeave = async (req, res, next) => {
   try {
-    const { employeeId, startDate, endDate, leaveType, reason, lateMark } = req.body;
-    if (!employeeId || !startDate || !endDate || !leaveType || !reason) {
+    const { startDate, endDate, leaveType, reason, lateMark } = req.body;
+    if (!startDate || !endDate || !leaveType || !reason) {
       return res.status(400).json({ message: 'Complete all required leave fields.' });
     }
-
-    // RBAC: Employees can ONLY submit leave requests for their own account
-    if (req.user && req.user.role === 'employee') {
-      const userEmpId = (req.user.employeeId || '').toUpperCase();
-      if (!userEmpId || employeeId.toUpperCase() !== userEmpId) {
-        return res.status(403).json({ message: 'You are not authorized to submit leave requests for other employees.' });
-      }
-    }
-
     if (new Date(endDate) < new Date(startDate)) {
       return res.status(400).json({ message: 'End date cannot be before the start date.' });
     }
+
+    let resolvedEmployeeId;
+
+    if (!req.user || req.user.role === 'admin') {
+      // Admin (or test harness) supplies employeeId in body
+      const { employeeId } = req.body;
+      if (!employeeId) return res.status(400).json({ message: 'Employee ID is required.' });
+      resolvedEmployeeId = employeeId.toUpperCase();
+    } else {
+      // Employee: always use their own authenticated employeeId — never from request body
+      const userEmpId = await getEffectiveEmployeeId(req.user);
+      if (!userEmpId) {
+        return res.status(400).json({
+          message: 'Your account is not linked to an employee record. Please contact an administrator.',
+        });
+      }
+      resolvedEmployeeId = userEmpId;
+    }
+
     const leave = await Leave.create({
-      employeeId: employeeId.toUpperCase(),
+      employeeId: resolvedEmployeeId,
       startDate,
       endDate,
       leaveType,
       reason,
-      lateMark
+      lateMark: lateMark || false,
     });
     res.status(201).json(leave);
   } catch (error) { next(error); }
@@ -32,7 +43,7 @@ export const applyLeave = async (req, res, next) => {
 
 export const getLeaves = async (req, res, next) => {
   try {
-    // RBAC: Admins view all leaves; Employees view only their own records
+    // Admins see all leaves; Employees see only their own records
     const filter = (req.user && req.user.role === 'employee')
       ? { employeeId: (req.user.employeeId || '').toUpperCase() }
       : {};

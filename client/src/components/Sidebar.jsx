@@ -17,7 +17,7 @@ const NAV = [
   {
     group: 'People',
     items: [
-      { to: '/employees', label: 'Employees',  icon: Users,           accent: '#2563EB' },
+      { to: '/employees', label: 'Employees',  icon: Users,           accent: '#2563EB', adminOnly: true },
       { to: '/attendance',label: 'Attendance', icon: CalendarCheck,   accent: '#0F9F8F' },
       { to: '/leaves',    label: 'Leave',      icon: ClipboardList,   accent: '#F4B740' },
     ],
@@ -31,8 +31,8 @@ const NAV = [
   {
     group: 'Analytics',
     items: [
-      { to: '/reports',   label: 'Reports',    icon: BarChart3,       accent: '#2563EB' },
-      { to: '/insights',  label: 'Insights',   icon: TrendingUp,      accent: '#7C3AED' },
+      { to: '/reports',   label: 'Reports',    icon: BarChart3,       accent: '#2563EB', adminOnly: true },
+      { to: '/insights',  label: 'Insights',   icon: TrendingUp,      accent: '#7C3AED', adminOnly: true },
     ],
   },
   {

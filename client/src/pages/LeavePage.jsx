@@ -14,12 +14,14 @@ const STATUS_BADGE = {
 
 export default function LeavePage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [employees, setEmployees] = useState([]);
   const [leaves,    setLeaves]    = useState([]);
   const [notice,    setNotice]    = useState({ msg: '', ok: true });
   const [saving,    setSaving]    = useState(false);
   const [form, setForm] = useState({
-    employeeId: '',
+    employeeId: '',       // only used by admin
     startDate: new Date().toISOString().slice(0, 10),
     endDate:   new Date().toISOString().slice(0, 10),
     leaveType: 'full-day',
@@ -27,18 +29,36 @@ export default function LeavePage() {
     lateMark:  false,
   });
 
+  // For employee view: their own linked employee record
+  const [myEmployee, setMyEmployee] = useState(null);
+  const [linkError,  setLinkError]  = useState('');
+
   const load = async () => {
     try {
-      const [empList, leaveList] = await Promise.all([employeeApi.list(), leaveApi.list()]);
-      setEmployees(empList);
-      setLeaves(leaveList);
-      setForm((c) => c.employeeId ? c : { ...c, employeeId: empList[0]?.employeeId ?? '' });
+      if (isAdmin) {
+        const [empList, leaveList] = await Promise.all([employeeApi.list(), leaveApi.list()]);
+        setEmployees(empList);
+        setLeaves(leaveList);
+        setForm((c) => c.employeeId ? c : { ...c, employeeId: empList[0]?.employeeId ?? '' });
+      } else {
+        // Employee: load own leaves from backend (server filters automatically)
+        const leaveList = await leaveApi.list();
+        setLeaves(leaveList);
+        // Also try fetching own employee record for display
+        try {
+          const emp = await employeeApi.me();
+          setMyEmployee(emp);
+        } catch (e) {
+          // Not yet linked — show a message but don't block viewing leaves
+          setLinkError(e.message || 'No employee record linked to your account.');
+        }
+      }
     } catch (e) {
       setNotice({ msg: e.message, ok: false });
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const names = useMemo(
     () => Object.fromEntries(employees.map((e) => [e.employeeId, e.name])),
@@ -47,11 +67,17 @@ export default function LeavePage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.employeeId) return setNotice({ msg: 'Add an employee before applying for leave.', ok: false });
+    if (isAdmin && !form.employeeId) {
+      return setNotice({ msg: 'Select an employee before applying for leave.', ok: false });
+    }
     setSaving(true);
     setNotice({ msg: '', ok: true });
     try {
-      const leave = await leaveApi.apply(form);
+      // Backend resolves employeeId for employees automatically — only send it for admin
+      const payload = isAdmin
+        ? { employeeId: form.employeeId, startDate: form.startDate, endDate: form.endDate, leaveType: form.leaveType, reason: form.reason, lateMark: form.lateMark }
+        : { startDate: form.startDate, endDate: form.endDate, leaveType: form.leaveType, reason: form.reason, lateMark: form.lateMark };
+      const leave = await leaveApi.apply(payload);
       setLeaves((cur) => [leave, ...cur]);
       setForm((c) => ({ ...c, reason: '', lateMark: false }));
       setNotice({ msg: 'Leave request submitted successfully.', ok: true });
@@ -83,7 +109,9 @@ export default function LeavePage() {
           Leave Management
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Submit leave requests and keep track of team availability.
+          {isAdmin
+            ? 'Submit leave requests and keep track of team availability.'
+            : 'Submit and track your leave requests.'}
         </p>
       </div>
 
@@ -102,21 +130,37 @@ export default function LeavePage() {
           </div>
 
           <div className="space-y-4">
-            {/* Employee */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Employee</label>
-              <select
-                value={form.employeeId}
-                onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-                className="mt-1.5 sp-input"
-              >
-                {employees.map((e) => (
-                  <option key={e._id} value={e.employeeId}>
-                    {e.name} — {e.employeeId}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* ── Employee picker (Admin only) ── */}
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Employee</label>
+                <select
+                  value={form.employeeId}
+                  onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+                  className="mt-1.5 sp-input"
+                >
+                  {employees.map((e) => (
+                    <option key={e._id} value={e.employeeId}>
+                      {e.name} — {e.employeeId}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* ── Employee self-info (Employee role) ── */}
+            {!isAdmin && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Applying as</p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">{user?.name}</p>
+                {myEmployee
+                  ? <p className="text-xs text-slate-500 font-mono">{myEmployee.employeeId}</p>
+                  : linkError
+                    ? <p className="mt-1 text-xs text-amber-600">{linkError}</p>
+                    : <p className="text-xs text-slate-400">Loading employee record…</p>
+                }
+              </div>
+            )}
 
             {/* Date range */}
             <div className="grid grid-cols-2 gap-3">
@@ -175,7 +219,7 @@ export default function LeavePage() {
 
             <button
               type="submit"
-              disabled={saving || !employees.length}
+              disabled={saving || (isAdmin && !employees.length)}
               className="sp-btn-primary w-full"
             >
               {saving ? 'Submitting…' : 'Submit request'}
@@ -194,7 +238,9 @@ export default function LeavePage() {
         <div className="sp-card overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">Leave requests</h2>
+              <h2 className="text-sm font-semibold text-slate-800">
+                {isAdmin ? 'Leave requests' : 'My leave requests'}
+              </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {pendingCount > 0
                   ? `${pendingCount} request${pendingCount > 1 ? 's' : ''} awaiting review`
@@ -219,7 +265,7 @@ export default function LeavePage() {
                     <tr key={leave._id}>
                       <td>
                         <p className="font-semibold text-slate-800">
-                          {names[leave.employeeId] || leave.employeeId}
+                          {names[leave.employeeId] || (isAdmin ? leave.employeeId : user?.name)}
                         </p>
                         <p className="text-xs text-slate-400">{leave.employeeId}</p>
                       </td>
@@ -243,7 +289,7 @@ export default function LeavePage() {
                         </span>
                       </td>
                       <td>
-                        {user?.role === 'admin' && leave.status === 'pending' ? (
+                        {isAdmin && leave.status === 'pending' ? (
                           <div className="flex gap-2">
                             <button
                               onClick={() => review(leave._id, 'approved')}

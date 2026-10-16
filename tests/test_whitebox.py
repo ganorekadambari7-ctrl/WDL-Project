@@ -659,9 +659,9 @@ class TestWB08RoleBasedAuthorization:
             headers={"Authorization": f"Bearer {emp_token}"},
         )
 
-        # In Salary Pro, this succeeds with 201 because employeeRoutes.js lacks authorize('admin').
-        assert resp.status_code == 201, (
-            f"[WB08c] Expected 201 demonstrating missing authorize('admin') on /api/employees, "
+        # In Salary Pro Phase 1 RBAC, employee tokens are blocked by authorize('admin') with 403 Forbidden.
+        assert resp.status_code == 403, (
+            f"[WB08c] Expected 403 demonstrating authorize('admin') on /api/employees blocks employee, "
             f"got {resp.status_code}"
         )
 

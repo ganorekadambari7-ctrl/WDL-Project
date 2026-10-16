@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['admin', 'employee'], default: 'employee' },
     department: { type: String, trim: true },
     employeeId: { type: String, trim: true },
+    employeeRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
     phone: { type: String, trim: true },
     jobTitle: { type: String, trim: true },
     dateOfJoining: { type: Date },

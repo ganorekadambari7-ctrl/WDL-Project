@@ -1,7 +1,23 @@
 import Employee from '../models/Employee.js';
+import { getLinkedEmployee } from '../middleware/auth.js';
 
 export const getEmployees = async (_req, res, next) => {
   try { res.json(await Employee.find().sort({ createdAt: -1 })); } catch (error) { next(error); }
+};
+
+/** Employee self-view: returns their own linked Employee record or 404 */
+export const getMyEmployee = async (req, res, next) => {
+  try {
+    if (req.user.role === 'admin') return res.status(403).json({ message: 'Admins should use GET /api/employees.' });
+    const emp = await getLinkedEmployee(req.user);
+    if (!emp) {
+      return res.status(404).json({
+        message: 'No employee record is linked to your account. Please contact an administrator.',
+        linked: false,
+      });
+    }
+    res.json({ ...emp.toObject(), linked: true });
+  } catch (error) { next(error); }
 };
 
 export const createEmployee = async (req, res, next) => {

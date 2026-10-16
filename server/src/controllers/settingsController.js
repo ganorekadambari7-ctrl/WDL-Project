@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import Employee from '../models/Employee.js';
 
-const publicUser = (user) => ({ id: user._id, name: user.name, username: user.username, email: user.email, role: user.role, department: user.department, employeeId: user.employeeId, phone: user.phone, jobTitle: user.jobTitle, dateOfJoining: user.dateOfJoining, address: user.address, profilePicture: user.profilePicture });
+const publicUser = (user) => ({ id: user._id, name: user.name, username: user.username, email: user.email, role: user.role, department: user.department, employeeId: user.employeeId, employeeRef: user.employeeRef, phone: user.phone, jobTitle: user.jobTitle, dateOfJoining: user.dateOfJoining, address: user.address, profilePicture: user.profilePicture });
 
 export const updateProfile = async (req, res, next) => {
   try {
@@ -33,7 +34,20 @@ export const removeProfilePicture = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-export const listUsers = async (_req, res, next) => { try { res.json(await User.find().sort({ name: 1 })); } catch (error) { next(error); } };
+export const listUsers = async (_req, res, next) => {
+  try {
+    const users = await User.find().sort({ name: 1 });
+    // Attach linked employee info for admin display
+    const employees = await Employee.find().select('employeeId name userId');
+    const empByUserId = Object.fromEntries(employees.filter(e => e.userId).map(e => [String(e.userId), e]));
+    const result = users.map(u => ({
+      ...publicUser(u),
+      linkedEmployee: empByUserId[String(u._id)] || null,
+    }));
+    res.json(result);
+  } catch (error) { next(error); }
+};
+
 export const updateRole = async (req, res, next) => {
   try {
     const { role } = req.body;
@@ -43,3 +57,41 @@ export const updateRole = async (req, res, next) => {
     res.json(publicUser(user));
   } catch (error) { next(error); }
 };
+
+/**
+ * Admin-only: explicitly link a User account to an Employee record.
+ * Body: { employeeId: "EMP-108" }   OR   { employeeObjectId: "<mongo _id>" }
+ * This is the safe, explicit mechanism — no name guessing.
+ */
+export const linkEmployeeToUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (user.role !== 'employee') return res.status(400).json({ message: 'Only employee-role users can be linked to an Employee record.' });
+
+    const { employeeId, employeeObjectId } = req.body;
+    let emp = null;
+    if (employeeObjectId) {
+      emp = await Employee.findById(employeeObjectId);
+    } else if (employeeId) {
+      emp = await Employee.findOne({ employeeId: employeeId.toUpperCase() });
+    }
+    if (!emp) return res.status(404).json({ message: 'Employee record not found. Check the Employee ID.' });
+
+    // Update User
+    user.employeeId = emp.employeeId.toUpperCase();
+    user.employeeRef = emp._id;
+    await user.save();
+
+    // Update Employee so userId is also set
+    emp.userId = user._id;
+    await emp.save();
+
+    res.json({
+      message: `User "${user.name}" successfully linked to Employee "${emp.name}" (${emp.employeeId}).`,
+      user: publicUser(user),
+      employee: emp,
+    });
+  } catch (error) { next(error); }
+};
+

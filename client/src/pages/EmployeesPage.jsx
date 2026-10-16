@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Edit3, Plus, Search, Trash2, Users } from 'lucide-react';
 import EmployeeForm from '../components/EmployeeForm';
 import { employeeApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 
-// Deterministic avatar color from name
 const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700',
   'bg-emerald-100 text-emerald-700',
@@ -21,10 +21,10 @@ function getInitials(name = '') {
   return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function SkeletonRow() {
+function SkeletonRow({ cols }) {
   return (
     <tr>
-      {[...Array(6)].map((_, i) => (
+      {[...Array(cols)].map((_, i) => (
         <td key={i} className="px-5 py-4 first:pl-6">
           <div className="sp-skeleton h-4 w-full max-w-[120px] rounded" />
         </td>
@@ -34,6 +34,9 @@ function SkeletonRow() {
 }
 
 export default function EmployeesPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
@@ -41,7 +44,7 @@ export default function EmployeesPage() {
   const [selected, setSelected]   = useState(null);
   const [open, setOpen]           = useState(false);
   const [saving, setSaving]       = useState(false);
-  const [confirmId, setConfirmId] = useState(null); // click-twice delete
+  const [confirmId, setConfirmId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -57,6 +60,7 @@ export default function EmployeesPage() {
   useEffect(() => { load(); }, []);
 
   const save = async (form) => {
+    if (!isAdmin) return;
     setSaving(true);
     setError('');
     try {
@@ -77,13 +81,12 @@ export default function EmployeesPage() {
   };
 
   const remove = async (emp) => {
+    if (!isAdmin) return;
     if (confirmId !== emp._id) {
-      // First click — ask for confirmation
       setConfirmId(emp._id);
       setTimeout(() => setConfirmId(null), 3000);
       return;
     }
-    // Second click — confirmed
     setConfirmId(null);
     try {
       await employeeApi.remove(emp._id);
@@ -97,32 +100,35 @@ export default function EmployeesPage() {
     `${e.name} ${e.employeeId} ${e.education}`.toLowerCase().includes(query.toLowerCase())
   );
 
+  // Number of table columns depends on role
+  const colCount = isAdmin ? 6 : 5;
+
   return (
     <div className="sp-page">
 
       {/* ── Page header ── */}
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">
-            Team Directory
-          </p>
-          <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">
-            Employees
-          </h1>
+          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Team Directory</p>
+          <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">Employees</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage employee profiles, salary structures, and records.
+            {isAdmin
+              ? 'Manage employee profiles, salary structures, and records.'
+              : 'View the company employee directory.'}
           </p>
         </div>
-        <button
-          onClick={() => { setSelected(null); setOpen(true); }}
-          className="sp-btn-primary"
-        >
-          <Plus size={16} />
-          Add employee
-        </button>
+        {/* Add employee button — admin only */}
+        {isAdmin && (
+          <button
+            onClick={() => { setSelected(null); setOpen(true); }}
+            className="sp-btn-primary"
+          >
+            <Plus size={16} />
+            Add employee
+          </button>
+        )}
       </div>
 
-      {/* ── Error notice ── */}
       {error && (
         <div className="mb-5">
           <p className="sp-notice-error">{error}</p>
@@ -163,14 +169,16 @@ export default function EmployeesPage() {
           <table className="sp-table min-w-[820px]">
             <thead>
               <tr>
-                {['Employee', 'Employee ID', 'Education', 'Experience', 'Basic Salary', 'Actions'].map((h) => (
+                {['Employee', 'Employee ID', 'Education', 'Experience', 'Basic Salary',
+                  ...(isAdmin ? ['Actions'] : [])
+                ].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
+                [...Array(5)].map((_, i) => <SkeletonRow key={i} cols={colCount} />)
               ) : shown.length ? (
                 shown.map((emp) => (
                   <tr key={emp._id}>
@@ -189,49 +197,48 @@ export default function EmployeesPage() {
                       </div>
                     </td>
 
-                    {/* Employee ID badge */}
+                    {/* Employee ID */}
                     <td>
-                      <span className="sp-badge-indigo font-mono tracking-wider">
-                        {emp.employeeId}
-                      </span>
+                      <span className="sp-badge-indigo font-mono tracking-wider">{emp.employeeId}</span>
                     </td>
 
                     <td className="text-slate-600">{emp.education}</td>
                     <td className="text-slate-600">{emp.experience} yrs</td>
                     <td className="font-semibold text-slate-800">{INR.format(emp.basicSalary)}</td>
 
-                    {/* Actions */}
-                    <td>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => { setSelected(emp); setOpen(true); }}
-                          title="Edit"
-                          className="rounded-lg p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
-                        >
-                          <Edit3 size={15} />
-                        </button>
-                        <button
-                          onClick={() => remove(emp)}
-                          title={confirmId === emp._id ? 'Click again to confirm delete' : 'Delete'}
-                          className={`rounded-lg p-2 transition ${
-                            confirmId === emp._id
-                              ? 'bg-rose-100 text-rose-600'
-                              : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
-                          }`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                        {confirmId === emp._id && (
-                          <span className="text-xs font-medium text-rose-500">Confirm?</span>
-                        )}
-                      </div>
-                    </td>
+                    {/* Actions — admin only */}
+                    {isAdmin && (
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => { setSelected(emp); setOpen(true); }}
+                            title="Edit"
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                          <button
+                            onClick={() => remove(emp)}
+                            title={confirmId === emp._id ? 'Click again to confirm delete' : 'Delete'}
+                            className={`rounded-lg p-2 transition ${
+                              confirmId === emp._id
+                                ? 'bg-rose-100 text-rose-600'
+                                : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                            }`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                          {confirmId === emp._id && (
+                            <span className="text-xs font-medium text-rose-500">Confirm?</span>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
-                /* Empty state */
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={colCount}>
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                       <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                         <Users size={24} />
@@ -240,7 +247,9 @@ export default function EmployeesPage() {
                       <p className="mt-1 text-xs text-slate-400">
                         {query
                           ? 'Try a different search term.'
-                          : 'Add your first employee to get started.'}
+                          : isAdmin
+                            ? 'Add your first employee to get started.'
+                            : 'No employee records available.'}
                       </p>
                     </div>
                   </td>
@@ -251,8 +260,8 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Modal */}
-      {open && (
+      {/* Modal — admin only */}
+      {isAdmin && open && (
         <EmployeeForm
           employee={selected}
           onSave={save}

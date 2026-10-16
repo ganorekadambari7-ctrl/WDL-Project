@@ -13,30 +13,31 @@ export async function request(path, options = {}) {
 
 export const authApi = {
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-  register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) })
+  register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const employeeApi = {
   list: () => request('/employees'),
+  me: () => request('/employees/me'),                                          // Employee self-view
   create: (body) => request('/employees', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => request(`/employees/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  remove: (id) => request(`/employees/${id}`, { method: 'DELETE' })
+  remove: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
 };
 
 export const attendanceApi = {
   mark: (body) => request('/attendance', { method: 'POST', body: JSON.stringify(body) }),
-  getByEmployee: (employeeId, month) => request(`/attendance/${employeeId}?month=${month}`)
+  getByEmployee: (employeeId, month) => request(`/attendance/${employeeId}?month=${month}`),
 };
 
 export const leaveApi = {
   list: () => request('/leave'),
   apply: (body) => request('/leave', { method: 'POST', body: JSON.stringify(body) }),
-  review: (id, status) => request(`/leave/${id}`, { method: 'PUT', body: JSON.stringify({ status }) })
+  review: (id, status) => request(`/leave/${id}`, { method: 'PUT', body: JSON.stringify({ status }) }),
 };
 
 export const salaryApi = {
   calculate: (body) => request('/salary/calculate', { method: 'POST', body: JSON.stringify(body) }),
-  getByEmployee: (employeeId) => request(`/salary/${employeeId}`)
+  getByEmployee: (employeeId) => request(`/salary/${employeeId}`),
 };
 
 export const settingsApi = {
@@ -44,7 +45,10 @@ export const settingsApi = {
   changePassword: (body) => request('/settings/password', { method: 'PUT', body: JSON.stringify(body) }),
   removeProfilePicture: () => request('/settings/profile-picture', { method: 'DELETE' }),
   users: () => request('/settings/users'),
-  updateRole: (id, role) => request(`/settings/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) })
+  updateRole: (id, role) => request(`/settings/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  // Admin-only: explicitly link a User to an Employee record
+  linkEmployee: (userId, employeeId) =>
+    request(`/settings/users/${userId}/link-employee`, { method: 'PUT', body: JSON.stringify({ employeeId }) }),
 };
 
 export const insightsApi = { get: () => request('/insights') };

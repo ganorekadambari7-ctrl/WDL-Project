@@ -7,7 +7,8 @@ const employeeSchema = new mongoose.Schema(
     dob: { type: Date, required: true },
     education: { type: String, required: true, trim: true },
     experience: { type: Number, required: true, min: 0, max: 70 },
-    basicSalary: { type: Number, required: true, min: 0 }
+    basicSalary: { type: Number, required: true, min: 0 },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
   { timestamps: true }
 );
