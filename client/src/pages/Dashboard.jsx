@@ -508,7 +508,13 @@ function EmployeeDashboard({ user }) {
         emp = await employeeApi.me();
         setEmployee(emp);
       } catch (err) {
-        if (err.message && err.message.toLowerCase().includes('no employee record')) {
+        if (
+          err.status === 404 ||
+          (err.message && (
+            err.message.toLowerCase().includes('no employee record') ||
+            err.message.toLowerCase().includes('not linked')
+          ))
+        ) {
           setUnlinked(true);
           setLoading(false);
           return;

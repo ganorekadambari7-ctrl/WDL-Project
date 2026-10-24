@@ -83,6 +83,12 @@ export default function ProfilePage() {
     setError('');
     setUnlinked(false);
     try {
+      if (user?.role === 'admin') {
+        // Admin accounts do not have standard employee personnel files
+        setLoading(false);
+        return;
+      }
+
       // 1. Fetch own linked employee record
       let emp = null;
       try {
@@ -234,6 +240,180 @@ export default function ProfilePage() {
               <span>Go to Settings</span>
               <ArrowRight size={14} />
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.role === 'admin') {
+    const adminName = user?.name || user?.username || 'Administrator';
+    return (
+      <div className="sp-page space-y-7 anim-fade-up">
+        {/* ── Page Header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">
+                System Administration
+              </p>
+              <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 flex items-center gap-1">
+                <ShieldCheck size={12} />
+                Root Administrator
+              </span>
+            </div>
+            <h1 className="mt-1.5 text-[1.6rem] font-semibold tracking-tight text-slate-900">
+              Administrator Profile
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Administrative credentials, security privileges, and centralized organization console.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => navigate('/settings')}
+              className="sp-btn-secondary text-xs flex items-center gap-1.5"
+            >
+              <span>Security &amp; Settings</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Administrator Hero Card ── */}
+        <div className="sp-card p-6 sm:p-7">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+            <div className="flex items-center gap-4">
+              <div
+                className={`flex size-16 items-center justify-center rounded-2xl font-bold text-xl flex-shrink-0 shadow-sm ${avatarColor(
+                  adminName
+                )}`}
+              >
+                {getInitials(adminName)}
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-xl font-bold text-slate-900">{adminName}</h2>
+                  <span className="font-mono text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                    @{user?.username || 'admin'}
+                  </span>
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                    Administrator
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-slate-600 mt-1">
+                  Full Administrative &amp; Governance Authority
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-2.5 text-right">
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                  Access Level
+                </p>
+                <p className="text-base font-bold text-indigo-700">
+                  Global Administrator
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── System Specification Grid ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pt-6 text-xs">
+            <div className="space-y-1">
+              <span className="text-slate-400 font-medium">Email Address</span>
+              <p className="font-semibold text-slate-800 text-sm truncate">
+                {user?.email || 'admin@salarypro.io'}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-slate-400 font-medium">Department</span>
+              <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                <Building2 size={15} className="text-indigo-600" />
+                <span>Executive Management</span>
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-slate-400 font-medium">Account Created</span>
+              <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                <Calendar size={15} className="text-indigo-600" />
+                <span>{formatDate(user?.createdAt)}</span>
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-slate-400 font-medium">Security Status</span>
+              <p className="font-semibold text-emerald-700 text-sm flex items-center gap-1.5">
+                <ShieldCheck size={15} className="text-emerald-600" />
+                <span>Protected &amp; Active</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Admin Governance Notice */}
+          <div className="mt-6 rounded-xl bg-slate-50 border border-slate-200/80 p-3.5 flex items-center gap-3 text-xs text-slate-500">
+            <Lock size={15} className="text-slate-400 flex-shrink-0" />
+            <span>
+              As a System Administrator, you hold unrestricted governance over workforce directories, compensation calculation engines, and company promotion pipelines.
+            </span>
+          </div>
+        </div>
+
+        {/* ── Quick Administrative Navigation Cards ── */}
+        <div className="space-y-3">
+          <h3 className="text-base font-bold text-slate-900">Administrative Operations</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              onClick={() => navigate('/employees')}
+              className="sp-card p-5 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+            >
+              <div className="size-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 group-hover:scale-105 transition-transform">
+                <Users size={20} />
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 flex items-center justify-between">
+                <span>Employee Directory</span>
+                <ArrowRight size={14} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
+              </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Manage staff profiles, departmental allocations, and personnel records.
+              </p>
+            </div>
+
+            <div
+              onClick={() => navigate('/payroll')}
+              className="sp-card p-5 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+            >
+              <div className="size-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-3 group-hover:scale-105 transition-transform">
+                <BriefcaseBusiness size={20} />
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 flex items-center justify-between">
+                <span>Payroll &amp; Compensation</span>
+                <ArrowRight size={14} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
+              </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Execute salary disbursements, tax deductions, and download payslips.
+              </p>
+            </div>
+
+            <div
+              onClick={() => navigate('/promotions')}
+              className="sp-card p-5 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+            >
+              <div className="size-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 mb-3 group-hover:scale-105 transition-transform">
+                <TrendingUp size={20} />
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 flex items-center justify-between">
+                <span>Promotion Management</span>
+                <ArrowRight size={14} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
+              </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Review eligibility, approve scheduled increments, and adjust grades.
+              </p>
+            </div>
           </div>
         </div>
       </div>

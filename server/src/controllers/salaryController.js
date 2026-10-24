@@ -1,9 +1,10 @@
 import Salary from '../models/Salary.js';
 import { getLinkedEmployee } from '../middleware/auth.js';
+import { syncScheduledPromotions } from './promotionController.js';
 
 export const calculateSalary = async (req, res, next) => {
   try {
-    const { employeeId, basicSalary, bonus = 0, taxDeduction = 0, lateMarkDeduction = 0 } = req.body;
+    const { employeeId, basicSalary, bonus = 0, taxDeduction = 0, lateMarkDeduction = 0, month } = req.body;
     const values = [basicSalary, bonus, taxDeduction, lateMarkDeduction].map(Number);
     if (!employeeId || values.some((value) => !Number.isFinite(value) || value < 0)) {
       return res.status(400).json({ message: 'Enter a valid employee and non-negative salary values.' });
@@ -11,8 +12,13 @@ export const calculateSalary = async (req, res, next) => {
     const [basic, bonusValue, tax, late] = values;
     const totalDeductions = tax + late;
     const netSalary = Math.max(0, basic + bonusValue - totalDeductions);
+    const payMonth = (typeof month === 'string' && month.trim()) ? month.trim() : new Date().toISOString().slice(0, 7);
+
+    await syncScheduledPromotions(employeeId).catch(() => {});
+
     const salary = await Salary.create({
       employeeId: employeeId.toUpperCase(),
+      month: payMonth,
       basicSalary: basic,
       bonus: bonusValue,
       taxDeduction: tax,

@@ -11,8 +11,25 @@ export const updateProfile = async (req, res, next) => {
     if (!/^\d{10}$/.test(phone)) return res.status(400).json({ message: 'Phone number must contain exactly 10 digits.' });
     const duplicate = await User.findOne({ email: email.toLowerCase(), _id: { $ne: req.user._id } });
     if (duplicate) return res.status(409).json({ message: 'That email is already in use.' });
-    req.user.name = name.trim(); req.user.email = email.toLowerCase().trim(); req.user.phone = phone; req.user.department = department || ''; req.user.jobTitle = jobTitle || ''; req.user.employeeId = employeeId || req.user.employeeId || `EMP-${String(req.user._id).slice(-6).toUpperCase()}`; req.user.dateOfJoining = dateOfJoining || undefined; req.user.address = address || ''; if (profilePicture !== undefined) req.user.profilePicture = profilePicture;
-    await req.user.save(); res.json(publicUser(req.user));
+    req.user.name = name.trim();
+    req.user.email = email.toLowerCase().trim();
+    req.user.phone = phone;
+    req.user.department = department || '';
+    req.user.jobTitle = jobTitle || '';
+    if (!req.user.employeeId) {
+      req.user.employeeId = `EMP-${String(req.user._id).slice(-6).toUpperCase()}`;
+    }
+    req.user.dateOfJoining = dateOfJoining || undefined;
+    req.user.address = address || '';
+    if (profilePicture !== undefined) req.user.profilePicture = profilePicture;
+    await req.user.save();
+
+    // If user is linked to an Employee record, keep name synchronized
+    if (req.user.employeeRef) {
+      await Employee.findByIdAndUpdate(req.user.employeeRef, { name: req.user.name }).catch(() => {});
+    }
+
+    res.json(publicUser(req.user));
   } catch (error) { next(error); }
 };
 

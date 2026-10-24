@@ -26,14 +26,14 @@ const publicUser = (user) => ({
 export const register = async (req, res, next) => {
   try {
     const { name, username, email, password, role } = req.body;
-    const normalizedEmail = email?.trim();
+    const normalizedEmail = email?.trim().toLowerCase();
     if (!name || !username || !normalizedEmail || !password || !role) {
       return res.status(400).json({ message: 'Name, username, email, password, and role are required.' });
     }
     if (!['admin', 'employee'].includes(role)) {
       return res.status(400).json({ message: 'Please select a valid role.' });
     }
-    if (!/^[A-Za-z ]{1,20}$/.test(name) || !/^[A-Za-z0-9._-]{4,20}$/.test(username)) {
+    if (!/^[A-Za-z .'-]{1,60}$/.test(name) || !/^[A-Za-z0-9._-]{4,20}$/.test(username)) {
       return res.status(400).json({ message: 'Please enter a valid name and username.' });
     }
     if (!allowedEmail.test(normalizedEmail)) {

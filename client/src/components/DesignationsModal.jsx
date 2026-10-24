@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, Edit2, Layers, Plus, Save, X } from 'lucide-react';
+import { Building2, Edit2, Layers, Plus, Save, Trash2, X } from 'lucide-react';
 import { departmentApi, promotionApi } from '../services/api';
 
 const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
@@ -152,6 +152,23 @@ export default function DesignationsModal({ onClose, onUpdated }) {
       description: dept.description || '',
     });
     setShowAddDept(true);
+  };
+
+  const handleDeleteDept = async (dept) => {
+    if (!window.confirm(`Are you sure you want to deactivate or remove the "${dept.name}" department?`)) {
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await departmentApi.remove(dept._id);
+      await loadData();
+      onUpdated?.();
+    } catch (err) {
+      setError(err.message || 'Failed to remove department.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filteredDesignations = designations.filter((d) =>
@@ -544,13 +561,24 @@ export default function DesignationsModal({ onClose, onUpdated }) {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => startEditDept(dept)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 ml-auto"
-                          >
-                            <Edit2 size={12} />
-                            <span>Edit</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-2.5">
+                            <button
+                              onClick={() => startEditDept(dept)}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
+                              title="Edit department"
+                            >
+                              <Edit2 size={12} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDept(dept)}
+                              className="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1"
+                              title="Deactivate or remove department"
+                            >
+                              <Trash2 size={12} />
+                              <span>Delete</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

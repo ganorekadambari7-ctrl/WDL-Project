@@ -96,17 +96,19 @@ export const notifyEmployeeOnCertificateDecision = async (adminUser, course, dec
   try {
     let targetUserId = null;
 
+    const empRef = course.employee?._id || course.employee;
+
     // 1. Check Employee doc's userId
-    if (course.employee) {
-      const emp = await Employee.findById(course.employee).select('userId employeeId');
+    if (empRef) {
+      const emp = await Employee.findById(empRef).select('userId employeeId');
       if (emp?.userId) {
         targetUserId = emp.userId;
       }
     }
 
     // 2. Check User with employeeRef
-    if (!targetUserId && course.employee) {
-      const u = await User.findOne({ employeeRef: course.employee }).select('_id');
+    if (!targetUserId && empRef) {
+      const u = await User.findOne({ employeeRef: empRef }).select('_id');
       if (u) targetUserId = u._id;
     }
 

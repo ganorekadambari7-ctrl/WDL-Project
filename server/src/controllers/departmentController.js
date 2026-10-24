@@ -1,6 +1,7 @@
 import Department from '../models/Department.js';
 import Designation from '../models/Designation.js';
 import Employee from '../models/Employee.js';
+import User from '../models/User.js';
 
 const DEFAULT_DEPARTMENTS = [
   { name: 'IT', code: 'IT', description: 'Information Technology & Engineering' },
@@ -98,10 +99,11 @@ export const updateDepartment = async (req, res, next) => {
       }
       dept.name = newName;
 
-      // Also cascade update designations and employees if department name is renamed
+      // Also cascade update designations, employees, and users if department name is renamed
       if (newName !== oldName) {
         await Designation.updateMany({ department: oldName }, { department: newName });
         await Employee.updateMany({ department: oldName }, { department: newName });
+        await User.updateMany({ department: oldName }, { department: newName }).catch(() => {});
       }
     }
 

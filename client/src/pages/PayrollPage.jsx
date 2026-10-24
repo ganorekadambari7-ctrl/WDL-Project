@@ -253,29 +253,47 @@ function EmployeePayrollView() {
           <table className="sp-table min-w-[680px]">
             <thead>
               <tr>
-                {['Calculated on', 'Basic', 'Bonus', 'Deductions', 'Net salary'].map((h) => (
+                {['Period / Date', 'Basic', 'Bonus', 'Deductions', 'Net salary'].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
+                <th className="text-right">Payslip</th>
               </tr>
             </thead>
             <tbody>
               {history.length ? (
                 history.map((rec) => (
                   <tr key={rec._id}>
-                    <td className="text-slate-500">
-                      {new Date(rec.createdAt).toLocaleDateString('en-IN', {
-                        day: '2-digit', month: 'short', year: 'numeric',
-                      })}
+                    <td className="text-slate-500 font-medium">
+                      <div>
+                        {rec.month ? (
+                          <span className="font-semibold text-slate-800">{rec.month}</span>
+                        ) : null}
+                        <p className="text-xs text-slate-400">
+                          {new Date(rec.createdAt).toLocaleDateString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                          })}
+                        </p>
+                      </div>
                     </td>
                     <td className="font-medium text-slate-800">{INR.format(rec.basicSalary)}</td>
                     <td className="text-emerald-600">+{INR.format(rec.bonus)}</td>
                     <td className="text-rose-600">−{INR.format(rec.totalDeductions)}</td>
                     <td className="font-bold text-indigo-700">{INR.format(rec.netSalary)}</td>
+                    <td className="text-right">
+                      <button
+                        onClick={() => downloadPayslip(myEmployee || { name: user?.name, employeeId: user?.employeeId }, rec)}
+                        className="sp-btn-secondary text-xs py-1 px-2.5 flex items-center gap-1.5 ml-auto text-indigo-600 hover:text-indigo-800 font-medium"
+                        title="Download payslip PDF for this period"
+                      >
+                        <Download size={13} />
+                        <span>PDF</span>
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                       <Calculator size={22} className="mb-2 text-slate-300" />
                       <p className="text-sm text-slate-500">No salary records found.</p>
@@ -371,7 +389,7 @@ function AdminPayrollView() {
     setSaving(true);
     setNotice({ msg: '', ok: true });
     try {
-      const salary = await salaryApi.calculate(form);
+      const salary = await salaryApi.calculate({ ...form, month });
       setHistory((cur) => [salary, ...cur]);
       setNotice({ msg: 'Salary calculated and saved successfully.', ok: true });
     } catch (err) {

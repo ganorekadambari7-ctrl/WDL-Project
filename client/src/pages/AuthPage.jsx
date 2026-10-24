@@ -418,10 +418,10 @@ export default function AuthPage({ mode }) {
         : authApi.login({ ...form, email: form.email.trim() }));
       setSuccess(isSignup ? 'Account created!' : 'Welcome back!');
       setTimeout(() => { login(data); navigate('/'); }, 700);
-    } catch {
-      setError(isSignup
+    } catch (err) {
+      setError(err?.message || (isSignup
         ? 'Unable to create account. Please try again.'
-        : 'Invalid username/email or password.');
+        : 'Invalid username/email or password.'));
     } finally {
       setLoading(false);
     }

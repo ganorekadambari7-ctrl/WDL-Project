@@ -96,6 +96,39 @@ async function ensureDefaultDesignations() {
   }
 }
 
+/**
+ * Automatically applies scheduled promotions whose effectiveDate has arrived.
+ */
+export async function syncScheduledPromotions(employeeId) {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const filter = { status: 'scheduled', effectiveDate: { $lte: today } };
+    if (employeeId) filter.employeeId = employeeId.toUpperCase();
+
+    const pendingPromos = await Promotion.find(filter).sort({ effectiveDate: 1 });
+    for (const promo of pendingPromos) {
+      const emp = await Employee.findOne({ employeeId: promo.employeeId });
+      if (emp) {
+        emp.department = promo.department;
+        emp.designation = promo.newDesignation;
+        emp.grade = promo.newGrade;
+        emp.basicSalary = promo.newSalary;
+        const desig = await Designation.findOne({
+          title: promo.newDesignation,
+          department: promo.department,
+        });
+        if (desig) emp.designationRef = desig._id;
+        await emp.save();
+      }
+      promo.status = 'applied';
+      await promo.save();
+    }
+  } catch (err) {
+    console.error('Error synchronizing scheduled promotions:', err);
+  }
+}
+
 /** GET /api/promotions/designations */
 export const getDesignations = async (req, res, next) => {
   try {
@@ -177,6 +210,7 @@ export const updateDesignation = async (req, res, next) => {
 export const getEligiblePromotions = async (req, res, next) => {
   try {
     await ensureDefaultDesignations();
+    await syncScheduledPromotions(req.params.employeeId);
     const employee = await Employee.findOne({ employeeId: req.params.employeeId.toUpperCase() });
     if (!employee) return res.status(404).json({ message: 'Employee record not found.' });
 
@@ -358,6 +392,7 @@ export const createPromotion = async (req, res, next) => {
 /** GET /api/promotions — Admin sees all; employee sees own */
 export const getPromotions = async (req, res, next) => {
   try {
+    await syncScheduledPromotions();
     let filter = {};
     if (req.user.role === 'admin') {
       filter = req.query.employeeId ? { employeeId: req.query.employeeId.toUpperCase() } : {};
@@ -376,6 +411,7 @@ export const getPromotions = async (req, res, next) => {
 export const getEmployeePromotionHistory = async (req, res, next) => {
   try {
     let targetEmpId = req.params.employeeId.toUpperCase();
+    await syncScheduledPromotions(targetEmpId === 'ME' ? undefined : targetEmpId);
     if (req.user.role === 'employee') {
       const emp = await getLinkedEmployee(req.user);
       if (targetEmpId === 'ME') {
@@ -399,13 +435,22 @@ export const getEmployeePromotionHistory = async (req, res, next) => {
  */
 export const getApplicableSalary = async (req, res, next) => {
   try {
-    const targetEmpId = req.params.employeeId.toUpperCase();
-    if (req.user.role === 'employee') {
-      const userEmpId = (req.user.employeeId || '').toUpperCase();
-      if (!userEmpId || userEmpId !== targetEmpId) {
-        return res.status(403).json({ message: "You are not authorized to check other employees' salary rates." });
+    let targetEmpId = req.params.employeeId.toUpperCase();
+
+    if (req.user && req.user.role === 'employee') {
+      const emp = await getLinkedEmployee(req.user);
+      if (targetEmpId === 'ME') {
+        if (!emp) return res.status(404).json({ message: 'No employee record linked to your account.' });
+        targetEmpId = emp.employeeId.toUpperCase();
+      } else {
+        const userEmpId = emp ? emp.employeeId.toUpperCase() : (req.user.employeeId || '').toUpperCase();
+        if (!userEmpId || userEmpId !== targetEmpId) {
+          return res.status(403).json({ message: "You are not authorized to check other employees' salary rates." });
+        }
       }
     }
+
+    await syncScheduledPromotions(targetEmpId);
 
     const employee = await Employee.findOne({ employeeId: targetEmpId });
     if (!employee) return res.status(404).json({ message: 'Employee not found.' });

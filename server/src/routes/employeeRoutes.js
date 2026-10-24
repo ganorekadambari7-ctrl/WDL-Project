@@ -11,9 +11,9 @@ router.use(protect);
 // Employee-only: view their own linked Employee record
 router.get('/me', getMyEmployee);
 
-// Admin-only write operations
+// Admin-only operations for full employee directory
 router.route('/')
-  .get(getEmployees)
+  .get(authorize('admin'), getEmployees)
   .post(authorize('admin'), createEmployee);
 
 router.route('/:id')

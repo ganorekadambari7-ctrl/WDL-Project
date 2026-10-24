@@ -16,19 +16,26 @@ export default function ReviewCertificateModal({ course, onClose, onSuccess }) {
 
   const handleOpenCertificate = () => {
     if (!course?.certificateUrl) return;
+    const url = course.certificateUrl.trim();
     if (isDataUrl) {
-      const win = window.open();
-      if (win) {
-        if (isPdf) {
-          win.document.write(
-            `<iframe src="${course.certificateUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
-          );
-        } else {
-          win.document.write(`<img src="${course.certificateUrl}" style="max-width:100%; height:auto;" alt="Certificate" />`);
+      try {
+        const parts = url.split(',');
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
         }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      } catch {
+        window.open(url, '_blank', 'noopener,noreferrer');
       }
-    } else {
-      window.open(course.certificateUrl, '_blank', 'noopener,noreferrer');
+    } else if (/^https?:\/\//i.test(url)) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 

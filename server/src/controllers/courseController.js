@@ -267,18 +267,6 @@ export const updateCourse = async (req, res) => {
       }
     }
 
-    // Security: Do NOT let non-admin set verification status directly
-    if (req.user.role === 'admin' && req.body.verificationStatus && ['verified', 'rejected', 'pending_review', 'not_submitted'].includes(req.body.verificationStatus)) {
-      course.verificationStatus = req.body.verificationStatus;
-      if (req.body.verificationStatus === 'verified' || req.body.verificationStatus === 'rejected') {
-        course.verifiedBy = req.user._id;
-        course.verifiedAt = new Date();
-      }
-      if (req.body.verificationRemarks !== undefined) {
-        course.verificationRemarks = req.body.verificationRemarks;
-      }
-    }
-
     await course.save();
 
     if (req.user.role === 'employee' && course.verificationStatus === 'pending_review' && course.certificateUrl) {

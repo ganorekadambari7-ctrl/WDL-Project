@@ -27,29 +27,38 @@ export default function AttendancePage() {
     setNotice({ msg: '', ok: true });
     try {
       if (isAdmin) {
-        const list = await employeeApi.list();
-        setEmployees(list);
-        if (!form.employeeId && list[0])
-          setForm((c) => ({ ...c, employeeId: list[0].employeeId }));
-        const responses = await Promise.all(
-          list.map((e) => attendanceApi.getByEmployee(e.employeeId, month))
-        );
-        setRecords(Object.fromEntries(list.map((e, i) => [e.employeeId, responses[i]])));
+        const [list, bulkRecords] = await Promise.all([
+          employeeApi.list(),
+          attendanceApi.list(month),
+        ]);
+        const empList = list || [];
+        setEmployees(empList);
+        if (!form.employeeId && empList[0]) {
+          setForm((c) => ({ ...c, employeeId: empList[0].employeeId }));
+        }
+
+        const recordsMap = {};
+        for (const e of empList) {
+          const empId = (e.employeeId || '').toUpperCase();
+          recordsMap[e.employeeId] = bulkRecords?.[empId] || {
+            records: [],
+            summary: { total: 0, present: 0, absent: 0, percentage: 0 },
+          };
+        }
+        setRecords(recordsMap);
       } else {
-        const selfEmpId = user?.employeeId || (user?.id ? `EMP-${String(user.id).slice(-6).toUpperCase()}` : (user?._id ? `EMP-${String(user._id).slice(-6).toUpperCase()}` : ''));
+        const selfEmpId = user?.employeeId || 'ME';
         const selfEmployee = {
           _id: user?.id || user?._id || 'self',
           name: user?.name || 'Employee',
           employeeId: selfEmpId,
         };
         setEmployees([selfEmployee]);
-        if (selfEmpId) {
-          try {
-            const selfRecord = await attendanceApi.getByEmployee(selfEmpId, month);
-            setRecords({ [selfEmpId]: selfRecord });
-          } catch {
-            setRecords({ [selfEmpId]: { records: [], summary: { total: 0, present: 0, absent: 0, percentage: 0 } } });
-          }
+        try {
+          const selfRecord = await attendanceApi.getByEmployee('me', month);
+          setRecords({ [selfEmpId]: selfRecord });
+        } catch {
+          setRecords({ [selfEmpId]: { records: [], summary: { total: 0, present: 0, absent: 0, percentage: 0 } } });
         }
       }
     } catch (e) {

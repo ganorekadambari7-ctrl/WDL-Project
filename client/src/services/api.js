@@ -6,8 +6,22 @@ export async function request(path, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
     ...options
   });
-  const data = response.status === 204 ? null : await response.json();
-  if (!response.ok) throw new Error(data.message || 'Request failed.');
+
+  if (response.status === 401 && !path.startsWith('/auth/')) {
+    localStorage.removeItem('salary-pro-token');
+    localStorage.removeItem('salary-pro-user');
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+      window.location.href = '/login';
+    }
+  }
+
+  const data = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    const err = new Error(data?.message || `Request failed with status ${response.status}.`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 
@@ -26,7 +40,8 @@ export const employeeApi = {
 
 export const attendanceApi = {
   mark: (body) => request('/attendance', { method: 'POST', body: JSON.stringify(body) }),
-  getByEmployee: (employeeId, month) => request(`/attendance/${employeeId}?month=${month}`),
+  list: (month) => request(`/attendance${month ? `?month=${month}` : ''}`),
+  getByEmployee: (employeeId, month) => request(`/attendance/${employeeId}${month ? `?month=${month}` : ''}`),
 };
 
 export const leaveApi = {

@@ -12,7 +12,15 @@ export const getSalaryInsights = async (_req, res, next) => {
     const bonuses = salaryRecords.filter((item) => item.bonus === 0).length;
     const present = attendance.filter((item) => item.status === 'present').length;
     const rate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
-    const trend = salaries.length > 1 ? (salaries[0].netSalary >= salaries[salaries.length - 1].netSalary ? 'upward' : 'downward') : 'steady';
+    let trend = 'steady';
+    if (salaryRecords.length > 1) {
+      const half = Math.floor(salaryRecords.length / 2);
+      const recentAvg = salaryRecords.slice(0, half).reduce((s, r) => s + r.netSalary, 0) / (half || 1);
+      const olderAvg = salaryRecords.slice(half).reduce((s, r) => s + r.netSalary, 0) / (salaryRecords.length - half || 1);
+      if (recentAvg > olderAvg * 1.02) trend = 'upward';
+      else if (recentAvg < olderAvg * 0.98) trend = 'downward';
+    }
+
     const suggestions = [
       bonuses ? `${bonuses} employee${bonuses > 1 ? 's have' : ' has'} no recorded bonus. Review extra-work eligibility before the next pay run.` : 'Bonus allocation looks complete across the latest salary records.',
       attendance.length ? `Attendance is ${rate}%. Use late-mark deductions consistently to keep payroll fair and predictable.` : 'Start recording attendance to enable attendance-based payroll insights.',

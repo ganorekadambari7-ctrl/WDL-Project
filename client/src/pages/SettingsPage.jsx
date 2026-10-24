@@ -63,7 +63,7 @@ export default function SettingsPage() {
   const [employees, setEmployees] = useState([]);
   const [notice,    setNotice]    = useState({ msg: '', ok: true });
   const [touched,   setTouched]   = useState({});
-  const [image,     setImage]     = useState({ valid: Boolean(user?.profilePicture), error: '' });
+  const [image,     setImage]     = useState({ valid: true, error: '' });
 
   const [linkModal, setLinkModal] = useState({
     isOpen: false,
@@ -149,10 +149,10 @@ export default function SettingsPage() {
       : 'border-emerald-400 focus:border-emerald-400 focus:ring-emerald-400/10'}`;
   };
 
-  // ── saveProfile (logic unchanged) ────────────────────────────────────
+  // ── saveProfile ───────────────────────────────────────────────────────
   const saveProfile = async (e) => {
     e.preventDefault();
-    if (!image.valid) { setImage({ valid: false, error: 'Profile image is required.' }); return; }
+    if (image.error) return;
     if (Object.keys(errors).length) { setTouched({ name: true, email: true, phone: true }); return; }
     try {
       const updated = await settingsApi.updateProfile(profile);
@@ -165,37 +165,37 @@ export default function SettingsPage() {
     }
   };
 
-  // ── changeImage (logic unchanged) ────────────────────────────────────
+  // ── changeImage ───────────────────────────────────────────────────────
   const changeImage = (e) => {
     const file = e.target.files?.[0];
     setNotice({ msg: '', ok: true });
     if (!file) {
-      update('profilePicture', '');
-      setImage({ valid: false, error: 'Profile image is required.' });
+      setImage({ valid: true, error: '' });
       return;
     }
     if (!['image/jpeg', 'image/png'].includes(file.type) || !/\.(jpg|jpeg|png)$/i.test(file.name)) {
-      update('profilePicture', '');
       setImage({ valid: false, error: 'Only JPG, JPEG, and PNG files are allowed.' });
       return;
     }
     if (file.size >= 2 * 1024 * 1024) {
-      update('profilePicture', '');
       setImage({ valid: false, error: 'Image size must be less than 2 MB.' });
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => { update('profilePicture', reader.result); setImage({ valid: true, error: '' }); };
+    reader.onload = () => {
+      update('profilePicture', reader.result);
+      setImage({ valid: true, error: '' });
+    };
     reader.readAsDataURL(file);
   };
 
-  // ── removeImage (logic unchanged) ────────────────────────────────────
+  // ── removeImage ───────────────────────────────────────────────────────
   const removeImage = async () => {
     try {
       const updated = await settingsApi.removeProfilePicture();
       updateUser(updated);
       setProfile((c) => ({ ...c, profilePicture: '' }));
-      setImage({ valid: false, error: 'Profile image is required.' });
+      setImage({ valid: true, error: '' });
       setNotice({ msg: 'Profile image removed.', ok: true });
     } catch (err) {
       setNotice({ msg: err.message, ok: false });
@@ -348,7 +348,7 @@ export default function SettingsPage() {
               <label className="text-sm font-medium text-slate-700">Profile picture</label>
 
               {/* Preview */}
-              {image.valid && profile.profilePicture && (
+              {profile.profilePicture && (
                 <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <img
                     src={profile.profilePicture}
@@ -374,11 +374,7 @@ export default function SettingsPage() {
                 accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 onChange={changeImage}
                 className={`sp-input py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-indigo-700 ${
-                  image.valid
-                    ? 'border-emerald-400'
-                    : image.error
-                    ? 'border-rose-400'
-                    : ''
+                  image.error ? 'border-rose-400' : ''
                 }`}
               />
               {image.error && <p className="text-xs text-rose-600">{image.error}</p>}

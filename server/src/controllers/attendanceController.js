@@ -28,6 +28,41 @@ export const markAttendance = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+export const getAllAttendance = async (req, res, next) => {
+  try {
+    const { start, end } = monthRange(req.query.month);
+    const records = await Attendance.find({ date: { $gte: start, $lt: end } }).sort({ date: 1 });
+
+    const grouped = {};
+    for (const record of records) {
+      const empId = (record.employeeId || '').toUpperCase();
+      if (!empId) continue;
+      if (!grouped[empId]) {
+        grouped[empId] = [];
+      }
+      grouped[empId].push(record);
+    }
+
+    const result = {};
+    for (const [empId, empRecords] of Object.entries(grouped)) {
+      const present = empRecords.filter((r) => r.status === 'present').length;
+      result[empId] = {
+        records: empRecords,
+        summary: {
+          total: empRecords.length,
+          present,
+          absent: empRecords.length - present,
+          percentage: empRecords.length ? Number(((present / empRecords.length) * 100).toFixed(1)) : 0,
+        },
+      };
+    }
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getEmployeeAttendance = async (req, res, next) => {
   try {
     let targetEmployeeId = req.params.employeeId.toUpperCase();
